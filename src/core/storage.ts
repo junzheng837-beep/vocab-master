@@ -154,14 +154,25 @@ export function createDriver(): StorageDriver {
   }
 }
 
-export const K = {
-  settings: 'cfg:settings',
-  logs: 'cfg:logs',
-  customBooks: 'cfg:customBooks',
-  /** 单词状态按单词单独存储，键为 state:<wordKey> */
-  statePrefix: 'state:',
-} as const
+/**
+ * 数据键名。
+ *
+ * 每个账号拥有独立的命名空间，登录后读写都在 u:<userId>: 下；
+ * 未登录时用 g: 前缀作为游客空间。切换账号不会串数据。
+ */
+export function makeKeys(prefix: string) {
+  return {
+    prefix,
+    settings: `${prefix}cfg:settings`,
+    logs: `${prefix}cfg:logs`,
+    customBooks: `${prefix}cfg:customBooks`,
+    statePrefix: `${prefix}state:`,
+    state: (key: string) => `${prefix}state:${key}`,
+  }
+}
 
-export function stateStorageKey(key: string) {
-  return K.statePrefix + key
+export type DataKeys = ReturnType<typeof makeKeys>
+
+export function keysFor(userId: string | null): DataKeys {
+  return makeKeys(userId ? `u:${userId}:` : 'g:')
 }

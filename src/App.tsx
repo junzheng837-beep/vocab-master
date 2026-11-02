@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { store, useAppState } from './core/store'
 import { logger } from './core/logger'
 import Sidebar, { type PageId } from './components/Sidebar'
+import UpdateBanner from './components/UpdateBanner'
 import HomePage from './pages/Home'
 import StudyHome from './pages/StudyHome'
 import StudyPage from './pages/Study'
@@ -10,8 +11,18 @@ import StatsPage from './pages/Stats'
 import SettingsPage from './pages/Settings'
 import ImportPage from './pages/Import'
 import DebugPage from './pages/Debug'
+import AccountPage from './pages/Account'
 
-const PAGES: PageId[] = ['home', 'study', 'library', 'stats', 'settings', 'import', 'debug']
+const PAGES: PageId[] = [
+  'home',
+  'study',
+  'library',
+  'stats',
+  'settings',
+  'import',
+  'debug',
+  'account',
+]
 
 interface Route {
   page: PageId
@@ -61,6 +72,7 @@ const TITLES: Record<PageId, string> = {
   settings: '设置',
   import: '导入词库',
   debug: '调试日志',
+  account: '我的账号',
 }
 
 export default function App() {
@@ -131,6 +143,8 @@ export default function App() {
         </div>
       </div>
 
+      <UpdateBanner />
+
       <div className="workspace">
         <Sidebar page={page} onNavigate={(p) => navigate(`/${p}`)} />
         <div className="main">
@@ -154,6 +168,7 @@ export default function App() {
           {page === 'settings' && <SettingsPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'import' && <ImportPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'debug' && <DebugPage />}
+          {page === 'account' && <AccountPage />}
         </div>
       </div>
     </div>

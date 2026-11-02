@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { createDriver, K, stateStorageKey, type StorageDriver } from './storage'
+import { createDriver, keysFor, type DataKeys, type StorageDriver } from './storage'
+import { LocalAuthProvider, type AuthUser } from './auth'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
 import { loadBook } from './dict'
 import { dataUrl } from './paths'
@@ -29,6 +30,8 @@ export interface SessionState {
 export interface AppState {
   ready: boolean
   error: string | null
+  /** 当前登录账号，null 表示游客 */
+  user: AuthUser | null
   settings: Settings
   states: Record<string, WordState>
   logs: Record<string, DailyLog>
@@ -62,10 +65,14 @@ const emptySession: SessionState = {
 
 class AppStore {
   private driver: StorageDriver = createDriver()
+  private auth: LocalAuthProvider = new LocalAuthProvider(this.driver)
+  /** 当前账号的数据命名空间 */
+  private keys: DataKeys = keysFor(null)
   private listeners = new Set<() => void>()
   private state: AppState = {
     ready: false,
     error: null,
+    user: null,
     settings: DEFAULT_SETTINGS,
     states: {},
     logs: {},
@@ -109,46 +116,130 @@ class AppStore {
       时间: new Date().toLocaleString('zh-CN'),
     })
     try {
-      const [settings, logs, customBooks, stateMap, manifest] = await Promise.all([
-        this.driver.get<Settings>(K.settings),
-        this.driver.get<Record<string, DailyLog>>(K.logs),
-        this.driver.get<CustomBook[]>(K.customBooks),
-        this.driver.entries<WordState>(K.statePrefix),
-        fetch(dataUrl('manifest.json'))
-          .then((r) => {
-            logger.debug('store', '词书清单响应', { status: r.status, ok: r.ok })
-            if (!r.ok) throw new Error(`词书清单加载失败（HTTP ${r.status}）`)
-            return r.json()
-          })
-          .then((d: { books: BookMeta[] }) => d.books),
-      ])
-
-      const states: Record<string, WordState> = {}
-      for (const [k, v] of Object.entries(stateMap)) {
-        states[k.slice(K.statePrefix.length)] = v
-      }
-
-      logger.info('store', '本地数据载入完成', {
-        词书数: manifest.length,
-        单词状态数: Object.keys(states).length,
-        自定义词书: customBooks?.length ?? 0,
-        学习日志天数: Object.keys(logs ?? {}).length,
-        是否已有设置: !!settings,
+      const user = await this.auth.current()
+      this.keys = keysFor(user?.id ?? null)
+      logger.info('auth', user ? '已恢复登录状态' : '当前为游客状态', {
+        账号: user?.username ?? '游客',
+        命名空间: this.keys.prefix,
       })
 
-      this.set({
-        ready: true,
-        settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) },
-        logs: logs ?? {},
-        customBooks: customBooks ?? [],
-        states,
-        manifest,
-      })
+      const manifest = await fetch(dataUrl('manifest.json'))
+        .then((r) => {
+          logger.debug('store', '词书清单响应', { status: r.status, ok: r.ok })
+          if (!r.ok) throw new Error(`词书清单加载失败（HTTP ${r.status}）`)
+          return r.json()
+        })
+        .then((d: { books: BookMeta[] }) => d.books)
+
+      this.set({ manifest })
+      await this.loadUserData(user)
+      this.set({ ready: true })
       logger.info('store', '应用初始化完成', this.state.settings)
     } catch (err) {
       logger.error('store', '应用初始化失败', err)
       this.set({ ready: true, error: err instanceof Error ? err.message : '初始化失败' })
     }
+  }
+
+  /** 按当前命名空间载入账号数据 */
+  private async loadUserData(user: AuthUser | null) {
+    const [settings, logs, customBooks, stateMap] = await Promise.all([
+      this.driver.get<Settings>(this.keys.settings),
+      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+      this.driver.get<CustomBook[]>(this.keys.customBooks),
+      this.driver.entries<WordState>(this.keys.statePrefix),
+    ])
+
+    const states: Record<string, WordState> = {}
+    for (const [k, v] of Object.entries(stateMap)) {
+      states[k.slice(this.keys.statePrefix.length)] = v
+    }
+
+    logger.info('store', '账号数据载入完成', {
+      账号: user?.username ?? '游客',
+      命名空间: this.keys.prefix,
+      单词状态数: Object.keys(states).length,
+      自建词书: customBooks?.length ?? 0,
+      自建词数: (customBooks ?? []).reduce((s, b) => s + b.words.length, 0),
+      学习日志天数: Object.keys(logs ?? {}).length,
+    })
+
+    this.set({
+      user,
+      settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) },
+      logs: logs ?? {},
+      customBooks: customBooks ?? [],
+      states,
+      session: { ...emptySession },
+    })
+  }
+
+  /* ------------------------------------------------------------ 账号 */
+
+  async register(username: string, password: string) {
+    logger.info('auth', '尝试注册', { username })
+    const user = await this.auth.register(username, password)
+    logger.info('auth', '注册成功', { id: user.id, username: user.username })
+    await this.migrateGuestData(user.id)
+    this.keys = keysFor(user.id)
+    await this.loadUserData(user)
+    await this.rebuildSession(null)
+    return user
+  }
+
+  async login(username: string, password: string) {
+    logger.info('auth', '尝试登录', { username })
+    const user = await this.auth.login(username, password)
+    logger.info('auth', '登录成功', { id: user.id, username: user.username })
+    this.keys = keysFor(user.id)
+    await this.loadUserData(user)
+    await this.rebuildSession(null)
+    return user
+  }
+
+  async logout() {
+    logger.info('auth', '退出登录', { username: this.state.user?.username })
+    await this.auth.logout()
+    this.keys = keysFor(null)
+    await this.loadUserData(null)
+    await this.rebuildSession(null)
+  }
+
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    await this.auth.changePassword(userId, oldPassword, newPassword)
+    logger.info('auth', '密码已修改', { userId })
+  }
+
+  /**
+   * 游客期间产生的自建词书，注册时归入新账号，
+   * 避免「先试用后注册」把辛苦导入的词弄丢。
+   */
+  private async migrateGuestData(userId: string) {
+    const guestKeys = keysFor(null)
+    const guestBooks = await this.driver.get<CustomBook[]>(guestKeys.customBooks)
+    if (!guestBooks?.length) return
+
+    const userKeys = keysFor(userId)
+    const existing = (await this.driver.get<CustomBook[]>(userKeys.customBooks)) ?? []
+    const merged = [...existing]
+    for (const b of guestBooks) {
+      if (!merged.some((x) => x.id === b.id)) merged.push(b)
+    }
+    await this.driver.set(userKeys.customBooks, merged)
+
+    // 迁移这些词书的学习记录
+    const entries = await this.driver.entries<WordState>(guestKeys.statePrefix)
+    const moved: [string, unknown][] = []
+    for (const v of Object.values(entries)) {
+      if (guestBooks.some((b) => b.id === v.bookId)) {
+        moved.push([userKeys.state(v.key), v])
+      }
+    }
+    if (moved.length) await this.driver.setMany(moved)
+    logger.info('auth', '游客自建词书已并入账号', {
+      词书数: guestBooks.length,
+      迁移学习记录: moved.length,
+    })
   }
 
   /* ------------------------------------------------------------ 设置 */
@@ -157,7 +248,7 @@ class AppStore {
     const settings: Settings = { ...this.state.settings, ...patch, updatedAt: Date.now() }
     logger.info('settings', '设置更新', patch)
     this.set({ settings })
-    await this.driver.set(K.settings, settings)
+    await this.driver.set(this.keys.settings, settings)
     // 学习范围变化后重建会话
     if (patch.activeBooks || patch.dailyNew !== undefined) {
       logger.debug('settings', '学习范围变化，重建会话')
@@ -340,7 +431,7 @@ class AppStore {
       }
       logger.info('settings', '词书加入我的词库', { bookId, 现有: next.activeBooks })
       this.set({ settings: next })
-      await this.driver.set(K.settings, next)
+      await this.driver.set(this.keys.settings, next)
     }
     await this.rebuildSession(bookId)
   }
@@ -427,7 +518,7 @@ class AppStore {
 
     const states = { ...this.state.states, [entry.key]: next }
     try {
-      await this.driver.set(stateStorageKey(entry.key), next)
+      await this.driver.set(this.keys.state(entry.key), next)
       logger.debug('storage', '单词状态已写入', { key: entry.key })
     } catch (err) {
       logger.error('storage', '单词状态写入失败', { key: entry.key, err })
@@ -443,7 +534,7 @@ class AppStore {
     log.updatedAt = now
     const logs = { ...this.state.logs, [dk]: log }
     logger.debug('rate', '今日统计更新', { 日期: dk, 新学: log.learned, 复习: log.reviewed, 评分分布: log.ratings })
-    void this.driver.set(K.logs, logs)
+    void this.driver.set(this.keys.logs, logs)
 
     const nextEntries = entries.slice()
     nextEntries[idx] = { ...entry, done: true }
@@ -502,7 +593,7 @@ class AppStore {
     }
     const customBooks = [...this.state.customBooks, book]
     this.set({ customBooks })
-    await this.driver.set(K.customBooks, customBooks)
+    await this.driver.set(this.keys.customBooks, customBooks)
     logger.info('import', '自建词书已保存', {
       名称: name,
       id: book.id,
@@ -517,11 +608,11 @@ class AppStore {
     const states: Record<string, WordState> = {}
     const toDelete: [string, unknown][] = []
     for (const [k, v] of Object.entries(this.state.states)) {
-      if (v.bookId === id) toDelete.push([stateStorageKey(k), v])
+      if (v.bookId === id) toDelete.push([this.keys.state(k), v])
       else states[k] = v
     }
     this.set({ customBooks, states })
-    await this.driver.set(K.customBooks, customBooks)
+    await this.driver.set(this.keys.customBooks, customBooks)
     for (const [k] of toDelete) await this.driver.remove(k)
     logger.warn('import', '自建词书已删除', { id, 连带删除的学习记录: toDelete.length })
   }
@@ -551,8 +642,8 @@ class AppStore {
       将删除单词状态: Object.keys(this.state.states).length,
       将删除日志天数: Object.keys(this.state.logs).length,
     })
-    await this.driver.clear(K.statePrefix)
-    await this.driver.set(K.logs, {})
+    await this.driver.clear(this.keys.statePrefix)
+    await this.driver.set(this.keys.logs, {})
     this.set({
       states: {},
       logs: {},
@@ -615,15 +706,15 @@ class AppStore {
 
     // 落盘
     for (const k of removedKeys) {
-      await this.driver.remove(stateStorageKey(k))
+      await this.driver.remove(this.keys.state(k))
     }
     for (const k of revertedKeys) {
-      await this.driver.set(stateStorageKey(k), states[k])
+      await this.driver.set(this.keys.state(k), states[k])
     }
 
     const logs = { ...this.state.logs }
     delete logs[dk]
-    await this.driver.set(K.logs, logs)
+    await this.driver.set(this.keys.logs, logs)
 
     this.set({ states, logs })
     await this.rebuildSession(this.state.session.scope)

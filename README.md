@@ -1,19 +1,26 @@
-# 单词 · 英语背单词
+# 拾词易记
 
-一个 macOS 风格的英语背单词应用。纯前端，数据存在浏览器本地，支持 8 本内置词书和自定义导入。
+> 拾起每一个词，记得更久
 
-**在线使用**：https://junzheng837-beep.github.io/vocab-master/
-**下载离线版**：https://github.com/junzheng837-beep/vocab-master/releases/latest
+一款 macOS 风格的英语背单词软件。桌面端 + 网页端同一套代码，数据存在本机，支持账号隔离与自定义词库导入。
+
+**官网**：https://junzheng837-beep.github.io/vocab-master/
+**在线使用**：https://junzheng837-beep.github.io/vocab-master/app/
+**下载安装**：https://github.com/junzheng837-beep/vocab-master/releases/latest
+
+![背单词界面](site/assets/shot-study.png)
 
 ## 功能
 
-- **8 本内置词书**：初中英语（1282）、高中英语（3299）、高考高频（800）、大学四级（3763）、四级高频（1000）、大学六级（5307）、考研英语（4736）、生活日常用语（815，按 12 个场景分组）
-- **闪卡式背诵**：先只看英文单词，点击下方或按空格才显示释义、音标、例句、短语、词根词缀
-- **四档评分**：`0` 待会再来（本轮重排）/ `1` 困难（1 天）/ `2` 一般（3 天）/ `3` 容易（7 天，连续答对时间隔递增）
-- **自定义词库**：粘贴单词即可导入，内置词库里有的会自动补上音标、释义、例句
+- **8 本内置词书，23000 词**：初中英语（1282）、高中英语（3299）、高考高频（800）、大学四级（3763）、四级高频（1000）、大学六级（5307）、考研英语（4736）、生活日常用语（815，按 12 个场景分组）
+- **闪卡式背诵**：进入只显示英文单词，点击下方空白或按空格才展开音标、释义、例句、短语、词根词缀
+- **四档评分**：`0` 待会再来（本轮重排）/ `1` 困难（1 天）/ `2` 一般（3 天）/ `3` 容易（7 天，连续答对时间隔递增至 120 天）
+- **自定义词库**：粘贴单词即可导入，内置词库里有的自动补全音标、释义、例句、词根
+- **账号体系**：注册登录后，自建词库与学习记录归属账号，切换账号互不影响；游客数据在注册时自动并入
 - **学习统计**：连续打卡、20 周热力图、未来 7 天复习量预测、评分分布
-- **一键重置今天**：把今天学过的词全部退回，重新背一遍，不影响其他日期
-- **调试日志**：`#/debug` 页面可查看每一步执行记录并导出
+- **一键重置今天**：把今天学过的词全部退回重来，不影响其他日期
+- **更新通知**：桌面端自动检测新版本并一键更新，网页端顶部提示
+- **调试日志**：`#/debug` 页面查看每一步执行记录，支持导出
 
 ## 快捷键
 
@@ -23,66 +30,82 @@
 | `←` `→` | 切换单词 |
 | `0` `1` `2` `3` | 评分 |
 
-## 本地运行
+## 开发
 
 ```bash
 npm install
-npm run dev        # 开发服务器 http://localhost:5173
-npm run build      # 构建到 dist/
-npm run preview    # 预览构建产物
+npm run dev            # 开发服务器 http://localhost:5173
+npm run build          # 构建官网（dist/）+ 应用（dist/app/）
+npm run electron:start # 用已构建的产物启动桌面端
+npm run electron:dev   # 构建并启动桌面端
 ```
 
-## 词库构建
+### 桌面端打包
+
+```bash
+npm run dist       # 生成 Windows 安装包到 release/
+npm run dist:dir   # 只生成免安装目录，用于本地调试
+```
+
+国内网络下载 Electron / NSIS 较慢时可加镜像：
+
+```bash
+ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/" \
+ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/" \
+npm run dist
+```
+
+## 发布流程
+
+推送 `main` 分支会自动构建并部署到 GitHub Pages（官网在根路径，应用在 `/app/`）。
+
+打 tag 会自动构建 Windows 安装包并创建 Release：
+
+```bash
+git tag v0.4.0
+git push origin v0.4.0
+```
+
+安装包文件名固定为 `shici-setup.exe`，因此官网的下载链接是永久链接，不需要随版本变化：
+
+```
+https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-setup.exe
+```
+
+## 项目结构
+
+```
+electron/         桌面端主进程与 preload
+src/core/         业务核心：调度、存储、账号、日志、更新检查
+src/pages/        页面
+src/components/   组件
+site/             官网静态页
+scripts/          构建脚本
+data/             词库构建脚本（从开源词典生成 public/data）
+public/data/      构建产出的词库数据
+```
+
+## 词库数据
 
 内置词库由 `data/build_dict.py` 从以下开源数据生成：
 
-- [ECDICT](https://github.com/skywind3000/ECDICT) — 77 万词条的英汉词典，提供音标、释义、考纲标签、词根词缀
+- [ECDICT](https://github.com/skywind3000/ECDICT) — 77 万词条英汉词典，提供音标、释义、考纲标签、词根词缀
 - [kajweb/dict](https://github.com/kajweb/dict) — 81 本词书，提供例句、短语、近义词
 
 ```bash
-# 先把数据源放到 data/raw/
-#   ecdict.csv、wordroot.txt、*.zip
+# 数据源放到 data/raw/：ecdict.csv、wordroot.txt、*.zip
 python data/build_dict.py
 ```
 
-产物写入 `public/data/`：
+## 数据与账号说明
 
-| 文件 | 说明 |
-| --- | --- |
-| `books/*.json` | 各词书词条，按需加载 |
-| `manifest.json` | 词书清单 |
-| `lookup.json` | 2.6 万词的查词索引，导入时用 |
-| `examples.json` | 例句/短语/词根索引，导入时给自建词补全 |
-
-## 部署
-
-### GitHub Pages
-
-推送到 `main` 分支后，`.github/workflows/deploy.yml` 会自动构建并部署。
-首次使用需在仓库 **Settings → Pages → Source** 选择 **GitHub Actions**。
-
-访问地址：`https://<用户名>.github.io/<仓库名>/`
-
-### 打包下载
-
-打 tag 即可触发 `.github/workflows/release.yml`，自动构建 zip 并创建 Release：
-
-```bash
-git tag v0.3.0
-git push origin v0.3.0
-```
-
-下载链接出现在仓库的 Releases 页面。
-
-### 自有服务器
-
-`npm run build` 后把 `dist/` 里的文件丢到网站目录即可。产物使用相对路径，放在根目录或子目录都能正常工作。
-
-## 数据存储
-
-所有数据保存在浏览器的 IndexedDB（库名 `vocab-master`）里，不上传任何服务器。
-清除浏览器数据会一并清空学习记录，重要进度请勿只留在一台设备上。
+- 数据保存在本机（浏览器 IndexedDB / 桌面端内置 Chromium 的存储目录），不上传任何服务器
+- 密码使用随机盐 + SHA-256 存储，明文不落盘
+- 账号按命名空间隔离：`u:<userId>:*` 为账号数据，`g:*` 为游客数据
+- 微信 / QQ / 手机号登录需要企业资质与短信服务商，暂未接入；账号层已做成可替换的 Provider，后续接入不影响已有数据
+- 跨设备同步依赖云端服务，尚未开通
 
 ## 技术栈
 
-Vite 7 · React 19 · TypeScript · 无 UI 框架、无路由库（hash 路由手写）
+Vite 7 · React 19 · TypeScript · Electron 45 · electron-builder
+无 UI 框架、无路由库（hash 路由手写）

@@ -1,5 +1,6 @@
 import { useAppState } from '../core/store'
 import { dateKey } from '../core/scheduler'
+import { BRAND } from '../core/brand'
 import {
   IconBooks,
   IconChart,
@@ -9,7 +10,15 @@ import {
   IconStudy,
 } from './Icons'
 
-export type PageId = 'home' | 'study' | 'library' | 'stats' | 'settings' | 'import' | 'debug'
+export type PageId =
+  | 'home'
+  | 'study'
+  | 'library'
+  | 'stats'
+  | 'settings'
+  | 'import'
+  | 'debug'
+  | 'account'
 
 interface Props {
   page: PageId
@@ -39,7 +48,12 @@ export default function Sidebar({ page, onNavigate }: Props) {
       badge: learnedToday ? String(learnedToday) : undefined,
     },
     { id: 'library', label: '词库', icon: <IconBooks /> },
-    { id: 'stats', label: '学习统计', icon: <IconChart />, badge: dueCount ? String(dueCount) : undefined },
+    {
+      id: 'stats',
+      label: '学习统计',
+      icon: <IconChart />,
+      badge: dueCount ? String(dueCount) : undefined,
+    },
   ]
 
   return (
@@ -68,6 +82,23 @@ export default function Sidebar({ page, onNavigate }: Props) {
       </button>
 
       <div style={{ flex: 1 }} />
+
+      <button
+        className="sidebar-user"
+        onClick={() => onNavigate('account')}
+        title={state.user ? `已登录：${state.user.username}` : '登录后词库归属账号'}
+      >
+        <span className={`mini-avatar ${state.user ? '' : 'guest'}`}>
+          {state.user ? state.user.username.slice(0, 1).toUpperCase() : '游'}
+        </span>
+        <span className="user-name">
+          {state.user ? state.user.username : '未登录'}
+        </span>
+        <span style={{ marginLeft: 'auto', color: 'var(--text-tertiary)', fontSize: 11 }}>
+          {state.user ? '' : '登录'}
+        </span>
+      </button>
+
       <button
         className={`nav-item ${page === 'settings' ? 'active' : ''}`}
         onClick={() => onNavigate('settings')}
@@ -77,6 +108,8 @@ export default function Sidebar({ page, onNavigate }: Props) {
         </span>
         <span className="nav-label">设置</span>
       </button>
+
+      <div className="sidebar-brand">{BRAND.short} v{__APP_VERSION__}</div>
     </nav>
   )
 }

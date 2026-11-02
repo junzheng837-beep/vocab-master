@@ -1,14 +1,24 @@
 {
-  "name": "vocab-master",
+  "name": "shici",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.4.0",
+  "description": "拾词易记 — 拾起每一个词，记得更久",
+  "author": "junzheng837-beep",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build:app": "tsc -b && vite build",
+    "build:site": "node scripts/build-site.mjs",
+    "build": "npm run build:app && npm run build:site",
+    "preview": "vite preview",
+    "electron:dev": "npm run build:app && electron .",
+    "electron:start": "electron .",
+    "dist": "npm run build && electron-builder --win",
+    "dist:dir": "npm run build && electron-builder --win --dir"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -16,7 +26,48 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.0.12",
     "typescript": "~5.9.0",
     "vite": "^7.1.0"
+  },
+  "build": {
+    "appId": "com.shici.vocab",
+    "productName": "Shici",
+    "copyright": "Copyright © 2026 Shici",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/app/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "shici-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "拾词易记",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "junzheng837-beep",
+        "repo": "vocab-master"
+      }
+    ]
   }
 }
