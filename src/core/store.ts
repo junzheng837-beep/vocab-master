@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { createDriver, keysFor, type DataKeys, type StorageDriver } from './storage'
 import { LocalAuthProvider, type AuthUser } from './auth'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
-import { loadBook, loadRoots, wordsFromLookup } from './dict'
+import { loadBook, loadRoots } from './dict'
 import { parseScope } from './scope'
 import { shuffle } from './utils'
 import { dataUrl } from './paths'
@@ -500,21 +500,31 @@ class AppStore {
     return out
   }
 
-  /** 词根专项：某个词根下的例词 */
+  /** 词根专项：某个词根下的例词（数据已内嵌在 roots.json，无需额外请求） */
   private async buildRootEntries(root: string): Promise<SessionEntry[]> {
     const roots = await loadRoots()
     const entry = roots.find((r) => r.r === root)
     if (!entry) return []
-    const words = await wordsFromLookup(entry.w)
-    return words.map((w) => ({
-      entryId: this.nextId('e'),
-      key: `__root__::${root}::${w.w.toLowerCase()}`,
-      bookId: `__root__:${root}`,
-      word: w,
-      isNew: false,
-      done: false,
-      retried: 0,
-    }))
+    return entry.w.map((item) => {
+      const word: RawWord = {
+        w: item.w,
+        uk: item.p,
+        us: item.p,
+        t: item.t,
+        s: [],
+        p: [],
+        r: [[entry.r, entry.m, entry.c]],
+      }
+      return {
+        entryId: this.nextId('e'),
+        key: `__root__::${root}::${item.w.toLowerCase()}`,
+        bookId: `__root__:${root}`,
+        word,
+        isNew: false,
+        done: false,
+        retried: 0,
+      }
+    })
   }
 
   /** 把词书加入「我的词库」，不触发会话重建 */

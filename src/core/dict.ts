@@ -136,7 +136,17 @@ export async function lookupWord(raw: string): Promise<RawWord | null> {
 export async function lookupWords(
   words: string[]
 ): Promise<{ hits: Map<string, RawWord>; misses: string[] }> {
-  const [index, enrich] = await Promise.all([loadLookup(), loadEnrich().catch(() => ({}))])
+  const index = await loadLookup()
+  // 例句索引较大，网络慢时最多等 15 秒，超时就用纯释义继续，不阻塞导入
+  const enrich = await Promise.race([
+    loadEnrich().catch(() => ({}) as Record<string, EnrichEntry>),
+    new Promise<Record<string, EnrichEntry>>((resolve) =>
+      setTimeout(() => {
+        logger.warn('dict', '例句索引加载超时，先只补释义')
+        resolve({})
+      }, 15000)
+    ),
+  ])
   const hits = new Map<string, RawWord>()
   const misses: string[] = []
   for (const raw of words) {

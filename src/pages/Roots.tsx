@@ -42,7 +42,7 @@ export default function RootsPage({ onStart }: Props) {
         q
           ? r.r.toLowerCase().includes(q) ||
             r.m.toLowerCase().includes(q) ||
-            r.w.some((w) => w.toLowerCase().includes(q))
+            r.w.some((x) => x.w.toLowerCase().includes(q))
           : true
       )
       .slice()
@@ -125,7 +125,7 @@ export default function RootsPage({ onStart }: Props) {
               </div>
               <div className="root-card-meaning">{r.m}</div>
               <div className="root-card-words">
-                {r.w.slice(0, 4).join(' · ')}
+                {r.w.slice(0, 4).map((x) => x.w).join(' · ')}
                 {r.w.length > 4 ? ' …' : ''}
               </div>
               <div className="root-card-foot">

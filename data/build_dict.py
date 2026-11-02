@@ -482,6 +482,15 @@ def main():
                 examples.append(w)
         if len(examples) < 2:
             continue
+        # 词条数据直接内嵌，词根专项就不必再拉 8MB 的例句索引
+        details = []
+        for w in examples[:14]:
+            meta = ecdict[w.lower()]
+            details.append({
+                'w': meta['word'],
+                'p': meta['phonetic'],
+                't': [[a, b] for a, b in meta['trans'][:3]],
+            })
         root_payload.append({
             'r': r['root'],
             'm': r['meaning'],
@@ -489,7 +498,7 @@ def main():
             'c': r['class'],
             'cat': r['cat'],
             'o': r['origin'],
-            'w': examples[:14],
+            'w': details,
         })
     root_payload.sort(key=lambda x: (-len(x['w']), x['r']))
     path = os.path.join(OUT, 'roots.json')

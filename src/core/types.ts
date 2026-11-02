@@ -93,6 +93,15 @@ export interface Settings {
   updatedAt: number
 }
 
+export interface RootWord {
+  /** 单词 */
+  w: string
+  /** 音标 */
+  p: string
+  /** 释义 */
+  t: [string, string][]
+}
+
 export interface RootEntry {
   /** 词根 */
   r: string
@@ -106,8 +115,8 @@ export interface RootEntry {
   cat?: string
   /** 语源 */
   o: string
-  /** 例词 */
-  w: string[]
+  /** 例词（含音标和释义，内嵌避免额外请求） */
+  w: RootWord[]
 }
 
 export interface DailyLog {
