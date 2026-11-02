@@ -2,6 +2,9 @@
 
 一个 macOS 风格的英语背单词应用。纯前端，数据存在浏览器本地，支持 8 本内置词书和自定义导入。
 
+**在线使用**：https://junzheng837-beep.github.io/vocab-master/
+**下载离线版**：https://github.com/junzheng837-beep/vocab-master/releases/latest
+
 ## 功能
 
 - **8 本内置词书**：初中英语（1282）、高中英语（3299）、高考高频（800）、大学四级（3763）、四级高频（1000）、大学六级（5307）、考研英语（4736）、生活日常用语（815，按 12 个场景分组）
