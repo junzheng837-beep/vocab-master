@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        run: |
+          cd dist
+          zip -r "../vocab-master-${GITHUB_REF_NAME}.zip" .
+          cd ..
+          ls -lh "vocab-master-${GITHUB_REF_NAME}.zip"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: vocab-master-${{ github.ref_name }}.zip
+          generate_release_notes: true
+          body: |
+            ## 下载
+
+            下载下面的 `vocab-master-${{ github.ref_name }}.zip`，解压后是一个纯静态站点。
+
+            **本地打开**：因为浏览器对 `file://` 下的模块加载有限制，直接双击 `index.html` 可能白屏。
+            解压后在该目录执行任意一个静态服务器即可：
+
+            ```bash
+            npx serve .
+            # 或
+            python -m http.server 8080
+            ```
+
+            然后访问终端提示的地址。
+
+            **部署到自己的服务器**：把解压出来的所有文件丢到网站根目录即可，
+            产物使用相对路径，放在任意子目录下都能正常工作。
+
+            ## 更新
+
+            学习数据保存在浏览器的 IndexedDB 里，换版本不会丢。
+            用新版本的文件覆盖旧文件，刷新页面即可。

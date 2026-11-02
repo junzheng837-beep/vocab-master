@@ -1,0 +1,68 @@
+{
+  "books": [
+    {
+      "id": "junior",
+      "name": "初中英语",
+      "desc": "中考大纲词汇，打好英语底子",
+      "count": 1282,
+      "category": "中学",
+      "tag": "大纲"
+    },
+    {
+      "id": "senior",
+      "name": "高中英语",
+      "desc": "高考大纲词汇，覆盖高中三年",
+      "count": 3299,
+      "category": "中学",
+      "tag": "大纲"
+    },
+    {
+      "id": "gaokao_core",
+      "name": "高考高频英语",
+      "desc": "按实际使用频率精选的高考核心词",
+      "count": 800,
+      "category": "中学",
+      "tag": "高频"
+    },
+    {
+      "id": "cet4",
+      "name": "大学英语四级",
+      "desc": "CET-4 大纲词汇",
+      "count": 3763,
+      "category": "大学",
+      "tag": "大纲"
+    },
+    {
+      "id": "cet4_core",
+      "name": "四级高频英语",
+      "desc": "按实际使用频率精选的四级核心词",
+      "count": 1000,
+      "category": "大学",
+      "tag": "高频"
+    },
+    {
+      "id": "cet6",
+      "name": "大学英语六级",
+      "desc": "CET-6 大纲词汇",
+      "count": 5307,
+      "category": "大学",
+      "tag": "大纲"
+    },
+    {
+      "id": "kaoyan",
+      "name": "考研英语",
+      "desc": "硕士研究生入学考试词汇",
+      "count": 4736,
+      "category": "大学",
+      "tag": "大纲"
+    },
+    {
+      "id": "daily",
+      "name": "生活日常用语",
+      "desc": "衣食住行高频词，按 12 个场景分组",
+      "count": 815,
+      "category": "实用",
+      "tag": "日常"
+    }
+  ]
+}
