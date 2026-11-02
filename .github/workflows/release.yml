@@ -25,6 +25,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package.json=$PKG tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::package.json 版本 ($PKG) 与 tag ($TAG) 不一致，请先同步版本号"
+            exit 1
+          fi
+
       - name: Build web app and site
         run: npm run build
 
