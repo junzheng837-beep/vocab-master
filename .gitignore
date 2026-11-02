@@ -8,4 +8,5 @@ data/raw
 
 # 本地工作区文件，不进仓库
 .workbuddy-ai
+.workbuddy
 .wbapp_*
