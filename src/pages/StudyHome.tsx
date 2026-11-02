@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { store, useAppState } from '../core/store'
 import { dateKey } from '../core/scheduler'
+import { scopeToParam } from '../core/scope'
 import type { BookMeta } from '../core/types'
-import { IconCheck, IconBooks, IconRefresh, IconStudy } from '../components/Icons'
+import { IconBooks, IconCheck, IconRefresh, IconStudy } from '../components/Icons'
 
 interface Props {
-  onStart: (bookId: string | null) => void
+  onStart: (scopeParam: string) => void
 }
 
 function BookCard({
@@ -73,6 +74,14 @@ export default function StudyHome({ onStart }: Props) {
     return map
   }, [states])
 
+  const wrongCount = useMemo(
+    () =>
+      Object.values(states).filter(
+        (s) => s.stage !== 'new' && (s.lapses > 0 || (s.lastRating ?? 3) <= 1)
+      ).length,
+    [states]
+  )
+
   const allBooks: (BookMeta & { custom?: boolean })[] = [
     ...manifest,
     ...customBooks.map((b) => ({
@@ -89,6 +98,23 @@ export default function StudyHome({ onStart }: Props) {
   // 只展示已加入学习的词库；公共词库只在「词库」页面出现
   const mine = allBooks.filter((b) => settings.activeBooks.includes(b.id))
   const continueScope = session.built && session.entries.length ? session.scope : undefined
+
+  // 自建词书的分组
+  const groups = useMemo(() => {
+    const out: { bookId: string; bookName: string; name: string; count: number }[] = []
+    for (const b of customBooks) {
+      if (!settings.activeBooks.includes(b.id)) continue
+      const byGroup = new Map<string, number>()
+      for (const w of b.words) {
+        if (!w.g) continue
+        byGroup.set(w.g, (byGroup.get(w.g) ?? 0) + 1)
+      }
+      for (const [name, count] of byGroup) {
+        out.push({ bookId: b.id, bookName: b.name, name, count })
+      }
+    }
+    return out
+  }, [customBooks, settings.activeBooks])
 
   async function handleResetToday() {
     if (
@@ -168,7 +194,7 @@ export default function StudyHome({ onStart }: Props) {
             <button
               className="btn btn-primary btn-lg"
               disabled={!mine.length}
-              onClick={() => onStart(continueScope ?? null)}
+              onClick={() => onStart(continueScope ?? 'all')}
             >
               <IconStudy size={16} />
               {continueScope ? '继续学习' : '混合学习全部'}
@@ -185,6 +211,31 @@ export default function StudyHome({ onStart }: Props) {
           </div>
         </div>
       </div>
+
+      {wrongCount > 0 && (
+        <>
+          <div className="section-label">需要加强</div>
+          <button
+            className="card wrong-card"
+            onClick={() => onStart(scopeToParam({ kind: 'wrong' }))}
+          >
+            <div className="row-between">
+              <div className="row" style={{ gap: 13 }}>
+                <span className="wrong-icon">
+                  <IconRefresh size={17} />
+                </span>
+                <div style={{ textAlign: 'left' }}>
+                  <div className="card-title">错词本</div>
+                  <div className="card-desc">评过「没记得」或「困难」的词，集中再刷一遍</div>
+                </div>
+              </div>
+              <span className="badge-due" style={{ minWidth: 28, height: 22 }}>
+                {wrongCount}
+              </span>
+            </div>
+          </button>
+        </>
+      )}
 
       <div className="section-label">我的词库</div>
       {mine.length === 0 ? (
@@ -217,6 +268,24 @@ export default function StudyHome({ onStart }: Props) {
             />
           ))}
         </div>
+      )}
+
+      {groups.length > 0 && (
+        <>
+          <div className="section-label">自定义分组</div>
+          <div className="chips" style={{ gap: 8 }}>
+            {groups.map((g) => (
+              <button
+                key={`${g.bookId}::${g.name}`}
+                className="group-chip"
+                onClick={() => onStart(scopeToParam({ kind: 'book', bookId: g.bookId, group: g.name }))}
+              >
+                <span>{g.name}</span>
+                <span className="group-chip-count">{g.count}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       <div className="section-label">说明</div>

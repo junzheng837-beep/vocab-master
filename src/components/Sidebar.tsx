@@ -7,6 +7,7 @@ import {
   IconHome,
   IconPlus,
   IconSettings,
+  IconSparkle,
   IconStudy,
 } from './Icons'
 
@@ -19,6 +20,7 @@ export type PageId =
   | 'import'
   | 'debug'
   | 'account'
+  | 'roots'
 
 interface Props {
   page: PageId
@@ -54,6 +56,7 @@ export default function Sidebar({ page, onNavigate }: Props) {
       icon: <IconChart />,
       badge: dueCount ? String(dueCount) : undefined,
     },
+    { id: 'roots', label: '词根词缀', icon: <IconSparkle /> },
   ]
 
   return (

@@ -1629,6 +1629,167 @@ textarea.input {
 }
 
 /* ==========================================================================
+   错词本 / 分组 / 词根 / 拼写
+   ========================================================================== */
+
+.wrong-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s var(--ease);
+  border-color: rgba(255, 159, 10, 0.24);
+  background: linear-gradient(135deg, rgba(255, 159, 10, 0.1), rgba(255, 159, 10, 0.02));
+}
+.wrong-card:hover {
+  background: linear-gradient(135deg, rgba(255, 159, 10, 0.16), rgba(255, 159, 10, 0.05));
+}
+.wrong-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 159, 10, 0.16);
+  color: var(--orange);
+  flex: 0 0 34px;
+}
+
+.group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  transition: all 0.16s var(--ease);
+}
+.group-chip:hover {
+  background: var(--bg-elevated-2);
+  border-color: var(--accent);
+}
+.group-chip-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 词根 ---------- */
+.root-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: 11px;
+}
+.root-card {
+  text-align: left;
+  padding: 15px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.18s var(--ease);
+}
+.root-card:hover {
+  background: var(--bg-elevated-2);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.root-card-name {
+  font-family: var(--font-word);
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+  word-break: break-word;
+  line-height: 1.35;
+}
+.root-card-class {
+  font-size: 9.5px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  margin-left: 8px;
+}
+.root-card-meaning {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.root-card-words {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  line-height: 1.55;
+  font-family: var(--font-word);
+}
+.root-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ---------- 拼写测试 ---------- */
+.spell-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 12px;
+  max-width: 620px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.spell-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.spell-input {
+  max-width: 320px;
+  text-align: center;
+  font-family: var(--font-word);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+.spell-input.ok {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.16);
+}
+.spell-input.bad {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
+}
+.spell-verdict {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.spell-verdict.ok {
+  color: var(--green);
+}
+.spell-verdict.bad {
+  color: var(--red);
+  font-family: var(--font-word);
+}
+
+/* ==========================================================================
    杂项
    ========================================================================== */
 

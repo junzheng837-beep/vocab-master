@@ -2,7 +2,9 @@ import { useSyncExternalStore } from 'react'
 import { createDriver, keysFor, type DataKeys, type StorageDriver } from './storage'
 import { LocalAuthProvider, type AuthUser } from './auth'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
-import { loadBook } from './dict'
+import { loadBook, loadRoots, wordsFromLookup } from './dict'
+import { parseScope } from './scope'
+import { shuffle } from './utils'
 import { dataUrl } from './paths'
 import { logger } from './logger'
 import type {
@@ -47,6 +49,8 @@ export const DEFAULT_SETTINGS: Settings = {
   activeBooks: ['cet4'],
   theme: 'auto',
   autoSpeak: false,
+  customOrder: 'import',
+  spellMode: false,
   updatedAt: 0,
 }
 
@@ -309,19 +313,10 @@ class AppStore {
     }
   }
 
-  private async doRebuildSession(scope: string | null = null) {
-    this.set({ session: { ...emptySession, loading: true, built: true, scope } })
+  private async doRebuildSession(scopeParam: string | null = null) {
+    this.set({ session: { ...emptySession, loading: true, built: true, scope: scopeParam } })
     const { settings } = this.state
-    const knownIds = new Set([
-      ...this.state.manifest.map((m) => m.id),
-      ...this.state.customBooks.map((b) => b.id),
-    ])
-
-    // 指定词书时只学这一本，否则学全部已选词书
-    const activeIds = (scope ? [scope] : settings.activeBooks).filter((id) => knownIds.has(id))
-
-    await this.ensureBooks(activeIds.filter((id) => !id.startsWith('custom:')))
-
+    const scope = parseScope(scopeParam)
     const now = Date.now()
     const today = startOfDay(now)
     const entries: SessionEntry[] = []
@@ -333,11 +328,49 @@ class AppStore {
     }
     const newQuota = Math.max(0, settings.dailyNew - newToday)
 
+    /* ------------------------------------------------ 错词本 / 词根专项 */
+    if (scope.kind === 'wrong' || scope.kind === 'root') {
+      const built = scope.kind === 'wrong'
+        ? await this.buildWrongEntries()
+        : await this.buildRootEntries(scope.root)
+      entries.push(...built)
+      logger.info('session', scope.kind === 'wrong' ? '错词本已构建' : '词根专项已构建', {
+        范围: scopeParam,
+        词数: built.length,
+      })
+      this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, scope: scopeParam } })
+      return
+    }
+
+    /* ------------------------------------------------ 词书范围 */
+    const knownIds = new Set([
+      ...this.state.manifest.map((m) => m.id),
+      ...this.state.customBooks.map((b) => b.id),
+    ])
+
+    const activeIds =
+      scope.kind === 'book'
+        ? knownIds.has(scope.bookId) ? [scope.bookId] : []
+        : settings.activeBooks.filter((id) => knownIds.has(id))
+
+    await this.ensureBooks(activeIds.filter((id) => !id.startsWith('custom:')))
+
     // 1. 取新词（各词书轮转，保证混合）
     const pools: { bookId: string; words: BookData['words'] }[] = []
     for (const id of activeIds) {
       const book = this.bookData(id)
-      if (book) pools.push({ bookId: id, words: book.words })
+      if (!book) continue
+      let words = book.words
+      // 自建词书：按设置决定是导入顺序还是随机打乱
+      if (id.startsWith('custom:')) {
+        if (scope.kind === 'book' && scope.group) {
+          words = words.filter((w) => w.g === scope.group)
+        }
+        if (settings.customOrder === 'random') {
+          words = shuffle(words)
+        }
+      }
+      pools.push({ bookId: id, words })
     }
 
     let taken = 0
@@ -405,7 +438,7 @@ class AppStore {
     }
 
     logger.info('session', '今日会话构建完成', {
-      范围: scope ?? '全部已选词书',
+      范围: scopeParam ?? '全部已选词书',
       参与词书: activeIds,
       今日已学: newToday,
       新词配额: newQuota,
@@ -415,24 +448,71 @@ class AppStore {
       队列总长: entries.length,
     })
 
-    this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, scope } })
+    this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, scope: scopeParam } })
+  }
+
+  /** 错词本：评过「没记得」或「困难」的词 */
+  private async buildWrongEntries(): Promise<SessionEntry[]> {
+    const wrong = Object.values(this.state.states)
+      .filter((s) => s.stage !== 'new' && (s.lapses > 0 || (s.lastRating ?? 3) <= 1))
+      .sort((a, b) => a.dueAt - b.dueAt)
+
+    const bookIds = [...new Set(wrong.map((s) => s.bookId))]
+    await this.ensureBooks(bookIds.filter((id) => !id.startsWith('custom:')))
+
+    const out: SessionEntry[] = []
+    for (const s of wrong) {
+      const book = this.bookData(s.bookId)
+      const word = book?.words.find((w) => w.w.toLowerCase() === s.word.toLowerCase())
+      if (!word) continue
+      out.push({
+        entryId: this.nextId('e'),
+        key: s.key,
+        bookId: s.bookId,
+        word,
+        isNew: false,
+        done: false,
+        retried: 0,
+      })
+    }
+    return out
+  }
+
+  /** 词根专项：某个词根下的例词 */
+  private async buildRootEntries(root: string): Promise<SessionEntry[]> {
+    const roots = await loadRoots()
+    const entry = roots.find((r) => r.r === root)
+    if (!entry) return []
+    const words = await wordsFromLookup(entry.w)
+    return words.map((w) => ({
+      entryId: this.nextId('e'),
+      key: `__root__::${root}::${w.w.toLowerCase()}`,
+      bookId: `__root__:${root}`,
+      word: w,
+      isNew: false,
+      done: false,
+      retried: 0,
+    }))
+  }
+
+  /** 把词书加入「我的词库」，不触发会话重建 */
+  async ensureActive(bookId: string) {
+    const { settings } = this.state
+    if (settings.activeBooks.includes(bookId)) return
+    const next: Settings = {
+      ...settings,
+      activeBooks: [...settings.activeBooks, bookId],
+      updatedAt: Date.now(),
+    }
+    logger.info('settings', '词书加入我的词库', { bookId, 现有: next.activeBooks })
+    this.set({ settings: next })
+    await this.driver.set(this.keys.settings, next)
   }
 
   /** 从词库选择页直接开始某一本词书 */
   async startBook(bookId: string) {
-    const { settings } = this.state
     logger.info('session', '从词库选择页开始学习', { bookId })
-    if (!settings.activeBooks.includes(bookId)) {
-      // 直接写设置，避免 updateSettings 触发一次多余的重建
-      const next: Settings = {
-        ...settings,
-        activeBooks: [...settings.activeBooks, bookId],
-        updatedAt: Date.now(),
-      }
-      logger.info('settings', '词书加入我的词库', { bookId, 现有: next.activeBooks })
-      this.set({ settings: next })
-      await this.driver.set(this.keys.settings, next)
-    }
+    await this.ensureActive(bookId)
     await this.rebuildSession(bookId)
   }
 

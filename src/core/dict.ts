@@ -1,4 +1,4 @@
-import type { BookData, BookMeta, RawWord } from './types'
+import type { BookData, BookMeta, RawWord, RootEntry } from './types'
 import { dataUrl } from './paths'
 import { logger, trace } from './logger'
 
@@ -178,6 +178,47 @@ export async function searchLookup(prefix: string, limit = 8): Promise<string[]>
       out.push(k)
       if (out.length >= limit) break
     }
+  }
+  return out
+}
+
+/* ---------------------------------------------------------------- 词根 */
+
+let rootsPromise: Promise<RootEntry[]> | null = null
+
+export function loadRoots(): Promise<RootEntry[]> {
+  if (!rootsPromise) {
+    rootsPromise = fetch(dataUrl('roots.json'))
+      .then((r) => {
+        if (!r.ok) throw new Error('词根数据加载失败')
+        return r.json()
+      })
+      .then((d: { roots: RootEntry[] }) => {
+        logger.info('dict', '词根数据载入', { 数量: d.roots.length })
+        return d.roots
+      })
+      .catch((err) => {
+        rootsPromise = null
+        throw err
+      })
+  }
+  return rootsPromise
+}
+
+/** 直接用查词索引 + 例句索引拼出词条，不依赖具体词书 */
+export async function wordsFromLookup(words: string[]): Promise<RawWord[]> {
+  const [index, enrich] = await Promise.all([loadLookup(), loadEnrich().catch(() => ({}))])
+  const out: RawWord[] = []
+  for (const raw of words) {
+    const key = raw.trim().toLowerCase()
+    const hit = index[key]
+    if (!hit) continue
+    out.push(
+      applyEnrich(
+        { w: raw.trim(), uk: hit.p, us: hit.p, t: hit.t, s: [], p: [], r: [] },
+        enrich
+      )
+    )
   }
   return out
 }

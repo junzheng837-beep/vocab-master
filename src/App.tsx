@@ -12,6 +12,7 @@ import SettingsPage from './pages/Settings'
 import ImportPage from './pages/Import'
 import DebugPage from './pages/Debug'
 import AccountPage from './pages/Account'
+import RootsPage from './pages/Roots'
 
 const PAGES: PageId[] = [
   'home',
@@ -22,6 +23,7 @@ const PAGES: PageId[] = [
   'import',
   'debug',
   'account',
+  'roots',
 ]
 
 interface Route {
@@ -73,6 +75,7 @@ const TITLES: Record<PageId, string> = {
   import: '导入词库',
   debug: '调试日志',
   account: '我的账号',
+  roots: '词根词缀',
 }
 
 export default function App() {
@@ -159,9 +162,9 @@ export default function App() {
           {page === 'home' && <HomePage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'study' &&
             (param ? (
-              <StudyPage scope={param === 'all' ? null : param} />
+              <StudyPage scope={param} />
             ) : (
-              <StudyHome onStart={(bookId) => navigate(bookId ? `/study/${bookId}` : '/study/all')} />
+              <StudyHome onStart={(scopeParam) => navigate(`/study/${scopeParam}`)} />
             ))}
           {page === 'library' && <LibraryPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'stats' && <StatsPage />}
@@ -169,6 +172,9 @@ export default function App() {
           {page === 'import' && <ImportPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'debug' && <DebugPage />}
           {page === 'account' && <AccountPage />}
+          {page === 'roots' && (
+            <RootsPage onStart={(scopeParam) => navigate(`/study/${scopeParam}`)} />
+          )}
         </div>
       </div>
     </div>

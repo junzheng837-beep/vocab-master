@@ -82,6 +82,41 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
             aria-label="自动发音"
           />
         </div>
+        <div className="list-item">
+          <div style={{ flex: 1 }}>
+            <div className="card-title">自定义词库的新词顺序</div>
+            <div className="card-desc">按导入顺序背，或者每次打乱顺序，避免靠位置记词</div>
+          </div>
+          <div className="segmented">
+            {(
+              [
+                ['import', '导入顺序'],
+                ['random', '随机打乱'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                className={settings.customOrder === v ? 'active' : ''}
+                onClick={() => void store.updateSettings({ customOrder: v })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="list-item">
+          <div style={{ flex: 1 }}>
+            <div className="card-title">拼写测试</div>
+            <div className="card-desc">
+              看完释义后要把单词打出来，比纯认读记得更牢
+            </div>
+          </div>
+          <button
+            className={`switch ${settings.spellMode ? 'on' : ''}`}
+            onClick={() => void store.updateSettings({ spellMode: !settings.spellMode })}
+            aria-label="拼写测试"
+          />
+        </div>
       </div>
 
       <div className="section-label">词书</div>

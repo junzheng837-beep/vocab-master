@@ -9,15 +9,27 @@ import { IconCheck, IconSparkle } from '../components/Icons'
 interface ParsedItem {
   word: string
   note: string
+  /** 分组名，来自 # 开头的行 */
+  group?: string
 }
 
-/** 解析用户粘贴的文本，支持「一行一个单词」和「单词 + 自定义释义」 */
+/** 解析用户粘贴的文本，支持「一行一个单词」和「单词 + 自定义释义」，# 开头为分组名 */
 function parseLines(text: string): ParsedItem[] {
   const out: ParsedItem[] = []
   const seen = new Set<string>()
+  let group: string | undefined
+
   for (const line of text.split(/\r?\n/)) {
     const raw = line.trim()
-    if (!raw || raw.startsWith('#')) continue
+    if (!raw) continue
+
+    // 分组标题：# 餐饮 / 【餐饮】/ ## 餐饮
+    const g = raw.match(/^#{1,3}\s*(.+)$/) ?? raw.match(/^【(.+)】$/)
+    if (g) {
+      group = g[1].trim() || undefined
+      continue
+    }
+    if (raw.startsWith('//')) continue
 
     let word = raw
     let note = ''
@@ -41,7 +53,7 @@ function parseLines(text: string): ParsedItem[] {
     const key = word.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ word, note })
+    out.push({ word, note, group })
   }
   return out
 }
@@ -99,19 +111,25 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
     const bookName = name.trim() || '我的词书'
     const words: RawWord[] = items.map((it) => {
       const hit = hits.get(it.word)
-      if (hit) return hit
-      const note = (manual[it.word] ?? it.note ?? '').trim()
-      return {
+      const base: RawWord = hit ?? {
         w: it.word,
-        t: note ? [['', note]] : [],
+        t: [],
         s: [],
         p: [],
         r: [],
       }
+      const note = (manual[it.word] ?? it.note ?? '').trim()
+      const out: RawWord = {
+        ...base,
+        t: base.t.length ? base.t : note ? [['', note]] : [],
+      }
+      if (it.group) out.g = it.group
+      return out
     })
     logger.info('import', '保存自建词书', {
       名称: bookName,
       词数: words.length,
+      分组: [...new Set(words.map((w) => w.g).filter(Boolean))],
       无释义: words.filter((w) => w.t.length === 0).length,
     })
     const book = await store.addCustomBook(

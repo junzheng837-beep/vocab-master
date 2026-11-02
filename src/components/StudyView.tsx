@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { store, useAppState } from '../core/store'
 import { speak } from '../core/speech'
+import { parseScope } from '../core/scope'
 import type { Rating } from '../core/types'
 import { IconChevronLeft, IconChevronRight, IconSpeaker } from './Icons'
 
@@ -20,7 +21,7 @@ function highlightSentence(en: string, word: string) {
   )
 }
 
-export default function StudyView({ scope }: { scope: string | null }) {
+export default function StudyView({ scope }: { scope: string }) {
   const state = useAppState()
   const { session, settings } = state
   const { entries, cursor, revealed } = session
@@ -32,21 +33,38 @@ export default function StudyView({ scope }: { scope: string | null }) {
   const finished = total > 0 && doneCount >= total
 
   const scopeName = useMemo(() => {
-    if (!scope) return '全部词库'
-    return (
-      state.manifest.find((m) => m.id === scope)?.name ??
-      state.customBooks.find((b) => b.id === scope)?.name ??
-      '词书'
-    )
+    if (!scope || scope === 'all') return '全部词库'
+    const parsed = parseScope(scope)
+    if (parsed.kind === 'wrong') return '错词本'
+    if (parsed.kind === 'root') return `词根 ${parsed.root}`
+    if (parsed.kind === 'book') {
+      const name =
+        state.manifest.find((m) => m.id === parsed.bookId)?.name ??
+        state.customBooks.find((b) => b.id === parsed.bookId)?.name ??
+        '词书'
+      return parsed.group ? `${name} · ${parsed.group}` : name
+    }
+    return '全部词库'
   }, [scope, state.manifest, state.customBooks])
 
-  // 进入页面时按当前词书准备会话；已经在学同一本则保持进度
+  // 拼写测试
+  const [spellInput, setSpellInput] = useState('')
+  const [spellResult, setSpellResult] = useState<'correct' | 'wrong' | null>(null)
+  const spellRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setSpellInput('')
+    setSpellResult(null)
+  }, [entry?.entryId])
+
+  // 进入页面时按当前范围准备会话；已经在学同一个范围则保持进度
   useEffect(() => {
     if (!state.ready) return
     if (session.built && session.scope === scope) return
-    if (scope && !state.settings.activeBooks.includes(scope)) {
+    const parsed = parseScope(scope)
+    if (parsed.kind === 'book' && !state.settings.activeBooks.includes(parsed.bookId)) {
       // 从公共词库点进来的，先加入「我的词库」再开始
-      void store.startBook(scope)
+      void store.ensureActive(parsed.bookId).then(() => store.rebuildSession(scope))
     } else {
       void store.rebuildSession(scope)
     }
@@ -57,6 +75,23 @@ export default function StudyView({ scope }: { scope: string | null }) {
     store.reveal()
     if (settings.autoSpeak && entry) speak(entry.word.w)
   }
+
+  const checkSpell = () => {
+    if (!entry) return
+    const target = entry.word.w.trim().toLowerCase()
+    const got = spellInput.trim().toLowerCase()
+    if (!got) return
+    setSpellResult(got === target ? 'correct' : 'wrong')
+    // 检查完主动失焦，这样 0-3 的评分快捷键才能继续用
+    spellRef.current?.blur()
+  }
+
+  // 拼写模式下，展开释义后自动聚焦输入框
+  useEffect(() => {
+    if (!revealed || !settings.spellMode) return
+    const t = setTimeout(() => spellRef.current?.focus(), 90)
+    return () => clearTimeout(t)
+  }, [revealed, settings.spellMode, entry?.entryId])
 
   const rate = (r: Rating) => {
     if (!revealed) return
@@ -321,6 +356,35 @@ export default function StudyView({ scope }: { scope: string | null }) {
       </div>
 
       <div className="study-bottom">
+        {settings.spellMode && revealed && (
+          <div className="spell-row">
+            <span className="spell-label">拼出来</span>
+            <input
+              ref={spellRef}
+              className={`input spell-input ${
+                spellResult === 'correct' ? 'ok' : spellResult === 'wrong' ? 'bad' : ''
+              }`}
+              placeholder="把刚才看到的单词打出来，回车检查"
+              value={spellInput}
+              spellCheck={false}
+              autoComplete="off"
+              onChange={(e) => {
+                setSpellInput(e.target.value)
+                setSpellResult(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  checkSpell()
+                }
+              }}
+            />
+            {spellResult === 'correct' && <span className="spell-verdict ok">拼对了</span>}
+            {spellResult === 'wrong' && (
+              <span className="spell-verdict bad">应该是 {entry.word.w}</span>
+            )}
+          </div>
+        )}
         <div className="rate-row">
           {RATE_META.map(({ r, label, sub }) => (
             <button

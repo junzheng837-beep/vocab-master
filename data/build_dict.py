@@ -7,6 +7,9 @@
 import csv, json, os, re, zipfile, sys, io
 from collections import OrderedDict
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from root_cn import ROOT_CN
+
 csv.field_size_limit(10**9)
 RAW = os.path.join(os.path.dirname(__file__), 'raw')
 OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'data')
@@ -81,18 +84,38 @@ def load_roots():
             continue
         # 词根名去掉用于消歧的尾部数字，如 pro-2 -> pro-
         root_name = re.sub(r'\d+$', '', key)
+        raw_examples = []
+        for ex in v.get('example', []) or []:
+            w = clean(ex)
+            if w and ' ' not in w:
+                raw_examples.append(w)
+        cn = ROOT_CN.get(root_name.lower()) or ROOT_CN.get(key.lower())
+        if cn is None:
+            cn = ROOT_CN.get(root_name.lower().rstrip('-')) or ROOT_CN.get(root_name.lower() + '-')
+        if cn is None:
+            # 合并条目如 "-able, -ible, -ble"，逐个尝试
+            for part in re.split(r'[,\s]+', root_name):
+                part = part.strip().lower()
+                if not part:
+                    continue
+                hit = ROOT_CN.get(part) or ROOT_CN.get(part.rstrip('-')) or ROOT_CN.get(part + '-')
+                if hit:
+                    cn = hit
+                    break
         item = {
             'root': root_name,
-            'meaning': meaning,
+            'meaning': cn or meaning,
+            'meaning_en': meaning,
             'class': ROOT_CLASS_CN.get(cls_raw, cls_raw or '词根'),
+            'cat': ('前缀' if 'prefix' in cls_raw else
+                    '后缀' if 'suffix' in cls_raw else
+                    '词根'),
             'origin': clean(v.get('origin', '')),
+            'examples': raw_examples,
         }
         root_entries.append(item)
-        for ex in v.get('example', []) or []:
-            w = clean(ex).lower()
-            if not w or ' ' in w:
-                continue
-            word_to_roots.setdefault(w, []).append(item)
+        for w in raw_examples:
+            word_to_roots.setdefault(w.lower(), []).append(item)
     return word_to_roots, root_entries
 
 # ---------------------------------------------------------------- kajweb 词书
@@ -447,6 +470,33 @@ def main():
     with_s = sum(1 for v in enrich.values() if v.get('s'))
     print('    examples: %d 词, 其中有例句 %d, %.2f MB'
           % (len(enrich), with_s, os.path.getsize(path) / 1024 / 1024))
+
+    # ---- 词根索引（词根词缀专项用）
+    print('[*] 构建词根索引 ...')
+    root_payload = []
+    for r in root_entries:
+        examples = []
+        for w in (r.get('examples') or []):
+            key = w.lower()
+            if key in ecdict and ecdict[key]['trans']:
+                examples.append(w)
+        if len(examples) < 2:
+            continue
+        root_payload.append({
+            'r': r['root'],
+            'm': r['meaning'],
+            'me': r.get('meaning_en', ''),
+            'c': r['class'],
+            'cat': r['cat'],
+            'o': r['origin'],
+            'w': examples[:14],
+        })
+    root_payload.sort(key=lambda x: (-len(x['w']), x['r']))
+    path = os.path.join(OUT, 'roots.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({'roots': root_payload}, f, ensure_ascii=False, separators=(',', ':'))
+    print('    roots: %d 个词根, %.2f MB'
+          % (len(root_payload), os.path.getsize(path) / 1024 / 1024))
 
     # ---- 书单
     manifest = {

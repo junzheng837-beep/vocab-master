@@ -86,7 +86,28 @@ export interface Settings {
   theme: 'auto' | 'light' | 'dark'
   /** 显示释义后自动发音 */
   autoSpeak: boolean
+  /** 自定义词库的新词顺序：导入顺序 / 随机打乱 */
+  customOrder: 'import' | 'random'
+  /** 拼写测试：看完释义后要求打出单词 */
+  spellMode: boolean
   updatedAt: number
+}
+
+export interface RootEntry {
+  /** 词根 */
+  r: string
+  /** 含义（优先中文） */
+  m: string
+  /** 英文原义 */
+  me?: string
+  /** 细分类型：词根 / 前缀 / 名词后缀 … */
+  c: string
+  /** 归一化大类：词根 / 前缀 / 后缀 */
+  cat?: string
+  /** 语源 */
+  o: string
+  /** 例词 */
+  w: string[]
 }
 
 export interface DailyLog {
