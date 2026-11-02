@@ -3,7 +3,7 @@ import { store, useAppState } from '../core/store'
 import { speak } from '../core/speech'
 import { parseScope } from '../core/scope'
 import type { Rating } from '../core/types'
-import { IconChevronLeft, IconChevronRight, IconSpeaker } from './Icons'
+import { IconChevronLeft, IconChevronRight, IconSparkle, IconSpeaker } from './Icons'
 
 const RATE_META: { r: Rating; label: string; sub: string }[] = [
   { r: 0, label: '待会再来', sub: '本轮重来' },
@@ -27,6 +27,7 @@ export default function StudyView({ scope }: { scope: string }) {
   const { entries, cursor, revealed } = session
 
   const entry = entries[cursor]
+  const inSpell = entry ? state.spellList.some((s) => s.key === entry.key) : false
   const doneCount = useMemo(() => entries.filter((e) => e.done).length, [entries])
   const total = entries.length
   const progress = total ? (doneCount / total) * 100 : 0
@@ -127,6 +128,29 @@ export default function StudyView({ scope }: { scope: string }) {
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  if (session.error) {
+    return (
+      <div className="empty">
+        <div className="empty-icon" style={{ color: 'var(--red)' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7.5v5.5M12 16.4v.1" />
+          </svg>
+        </div>
+        <div className="empty-title">这一组单词没能准备好</div>
+        <div className="empty-desc">{session.error}</div>
+        <div className="row" style={{ marginTop: 6 }}>
+          <button className="btn btn-primary" onClick={() => void store.rebuildSession(scope)}>
+            重试
+          </button>
+          <button className="btn" onClick={() => (window.location.hash = '/study')}>
+            换一组
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (session.loading) {
     return (
       <div className="loading-screen">
@@ -137,15 +161,29 @@ export default function StudyView({ scope }: { scope: string }) {
   }
 
   if (!total) {
+    const parsed = parseScope(scope)
+    const emptyText =
+      parsed.kind === 'root'
+        ? {
+            title: '这个词根暂时没有可背的词',
+            desc: '它的例词不在内置词典里，换一个词根试试。',
+          }
+        : parsed.kind === 'wrong'
+          ? {
+              title: '错词本是空的',
+              desc: '等你把某些词评成「没记得」或「困难」，它们就会自动出现在这里。',
+            }
+          : {
+              title: '今天没有要背的单词',
+              desc: '可能是所有到期单词都复习完了，或者你还没选择词书。去「词库」里挑一本，或者在「设置」里调整每天的新词数量。',
+            }
     return (
       <div className="empty">
         <div className="empty-icon">
           <IconSpeaker size={24} />
         </div>
-        <div className="empty-title">今天没有要背的单词</div>
-        <div className="empty-desc">
-          可能是所有到期单词都复习完了，或者你还没选择词书。去「词库」里挑一本，或者在「设置」里调整每天的新词数量。
-        </div>
+        <div className="empty-title">{emptyText.title}</div>
+        <div className="empty-desc">{emptyText.desc}</div>
         <div className="row" style={{ marginTop: 6 }}>
           <button className="btn" onClick={() => void store.rebuildSession(scope)}>
             重新生成今日计划
@@ -235,6 +273,18 @@ export default function StudyView({ scope }: { scope: string }) {
             {!entry.isNew && entry.retried === 0 && <span className="word-badge">复习</span>}
             {entry.retried > 0 && <span className="word-badge retry">第 {entry.retried + 1} 次</span>}
             {entry.word.g && <span className="word-badge">{entry.word.g}</span>}
+            <button
+              className={`word-badge spell-toggle ${inSpell ? 'on' : ''}`}
+              title={inSpell ? '已加入拼写练习' : '加入拼写练习'}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (inSpell) void store.removeFromSpellList(entry.key)
+                else void store.addToSpellList(entry.key, entry.word)
+              }}
+            >
+              <IconSparkle size={11} />
+              {inSpell ? '已在拼写' : '加入拼写'}
+            </button>
           </div>
         </div>
 

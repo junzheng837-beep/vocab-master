@@ -856,6 +856,25 @@ textarea.input {
   color: var(--orange);
 }
 
+.spell-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  border: 1px solid var(--separator);
+  background: transparent;
+  transition: all 0.16s var(--ease);
+}
+.spell-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.spell-toggle.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(10, 132, 255, 0.3);
+}
+
 /* 点击揭示区 */
 .reveal-zone {
   flex: 1;
@@ -1362,6 +1381,32 @@ textarea.input {
   color: var(--accent);
 }
 
+.book-add-btn {
+  margin-top: 4px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(10, 132, 255, 0.24);
+  transition: all 0.16s var(--ease);
+  width: 100%;
+}
+.book-add-btn:hover {
+  background: rgba(10, 132, 255, 0.18);
+}
+.book-add-btn.added {
+  color: var(--text-secondary);
+  background: transparent;
+  border-color: var(--separator);
+}
+.book-add-btn.added:hover {
+  color: var(--red);
+  border-color: rgba(255, 69, 58, 0.3);
+  background: rgba(255, 69, 58, 0.08);
+}
+
 /* ==========================================================================
    导入
    ========================================================================== */
@@ -1787,6 +1832,130 @@ textarea.input {
 .spell-verdict.bad {
   color: var(--red);
   font-family: var(--font-word);
+}
+
+/* ==========================================================================
+   拼写练习
+   ========================================================================== */
+
+.spell-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+  padding: 30px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.spell-cn {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  text-align: center;
+  max-width: 560px;
+}
+.spell-cn-line {
+  font-size: 19px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+.spell-pos {
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+.spell-mask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  font-family: var(--font-word);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  padding: 6px 0;
+  transition: color 0.2s;
+}
+.spell-mask.bad {
+  animation: shake 0.36s var(--ease);
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.mask-blank {
+  color: var(--text-tertiary);
+  opacity: 0.55;
+}
+.mask-char {
+  color: var(--accent);
+}
+
+.spell-input-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+}
+.spell-main-input {
+  height: 42px;
+  font-size: 17px;
+  text-align: center;
+  font-family: var(--font-word);
+  letter-spacing: 0.03em;
+}
+.spell-main-input.ok {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.16);
+}
+.spell-main-input.bad {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(255, 69, 58, 0.16);
+}
+
+.spell-feedback {
+  font-size: 13px;
+  font-weight: 600;
+}
+.spell-feedback.ok {
+  color: var(--green);
+}
+.spell-feedback.bad {
+  color: var(--red);
+}
+
+.spell-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.spell-hint-text {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.spell-detail {
+  margin-top: 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+}
+.spell-word-big {
+  font-family: var(--font-word);
+  font-size: 32px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 /* ==========================================================================

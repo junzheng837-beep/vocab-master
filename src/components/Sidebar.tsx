@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconSettings,
   IconSparkle,
+  IconSpell,
   IconStudy,
 } from './Icons'
 
@@ -21,6 +22,7 @@ export type PageId =
   | 'debug'
   | 'account'
   | 'roots'
+  | 'spell'
 
 interface Props {
   page: PageId
@@ -31,6 +33,7 @@ export default function Sidebar({ page, onNavigate }: Props) {
   const state = useAppState()
   const today = state.logs[dateKey(Date.now())]
   const learnedToday = today?.learned ?? 0
+  const spellCount = state.spellList.length
   const dueCount = (() => {
     let n = 0
     const now = Date.now()
@@ -57,6 +60,12 @@ export default function Sidebar({ page, onNavigate }: Props) {
       badge: dueCount ? String(dueCount) : undefined,
     },
     { id: 'roots', label: '词根词缀', icon: <IconSparkle /> },
+    {
+      id: 'spell',
+      label: '拼写练习',
+      icon: <IconSpell />,
+      badge: spellCount ? String(spellCount) : undefined,
+    },
   ]
 
   return (

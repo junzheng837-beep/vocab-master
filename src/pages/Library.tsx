@@ -72,10 +72,15 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                 const selected = settings.activeBooks.includes(b.id)
                 const learned = progress[b.id] ?? 0
                 return (
-                  <button
+                  <div
                     key={b.id}
                     className={`book-card ${selected ? 'selected' : ''}`}
                     onClick={() => toggle(b.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') toggle(b.id)
+                    }}
                   >
                     <div className="row-between">
                       <span className="book-name">{b.name}</span>
@@ -90,7 +95,16 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                         {learned} / {b.count} 词
                       </span>
                     </div>
-                  </button>
+                    <button
+                      className={`book-add-btn ${selected ? 'added' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggle(b.id)
+                      }}
+                    >
+                      {selected ? '已在词库 · 点击移出' : '加入我的词库'}
+                    </button>
+                  </div>
                 )
               })}
             </div>

@@ -59,7 +59,7 @@ let lookupPromise: Promise<Record<string, LookupEntry>> | null = null
 /** 懒加载查词索引，仅在导入自定义词库时触发 */
 export function loadLookup(): Promise<Record<string, LookupEntry>> {
   if (!lookupPromise) {
-    lookupPromise = fetch('/data/lookup.json')
+    lookupPromise = fetch(dataUrl('lookup.json'))
       .then((r) => {
         if (!r.ok) throw new Error('查词索引加载失败')
         return r.json()
@@ -84,7 +84,7 @@ let enrichPromise: Promise<Record<string, EnrichEntry>> | null = null
 
 export function loadEnrich(): Promise<Record<string, EnrichEntry>> {
   if (!enrichPromise) {
-    enrichPromise = fetch('/data/examples.json')
+    enrichPromise = fetch(dataUrl('examples.json'))
       .then((r) => {
         if (!r.ok) throw new Error('例句索引加载失败')
         return r.json()

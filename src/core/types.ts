@@ -127,6 +127,15 @@ export interface CustomBook {
   words: RawWord[]
 }
 
+/** 拼写练习列表里的一项 */
+export interface SpellItem {
+  /** 唯一键，通常为 bookId::word */
+  key: string
+  /** 词条完整数据，自带释义、音标、例句，不依赖词书是否加载 */
+  word: RawWord
+  addedAt: number
+}
+
 /** 会话中的一个条目 */
 export interface SessionEntry {
   entryId: string

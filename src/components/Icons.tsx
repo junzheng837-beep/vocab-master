@@ -160,3 +160,13 @@ export function IconSun({ size = 16, className }: IconProps) {
     </svg>
   )
 }
+
+export function IconSpell({ size = 17, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <rect x="2.5" y="6.5" width="19" height="11" rx="2.4" />
+      <path d="M6.4 10.2h.01M9.6 10.2h.01M12.8 10.2h.01M16 10.2h.01M18.4 10.2h.01" strokeWidth={2.2} />
+      <path d="M7.2 14h9.6" />
+    </svg>
+  )
+}

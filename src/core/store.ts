@@ -12,9 +12,11 @@ import type {
   BookMeta,
   CustomBook,
   DailyLog,
+  RawWord,
   Rating,
   SessionEntry,
   Settings,
+  SpellItem,
   WordState,
 } from './types'
 
@@ -25,6 +27,8 @@ export interface SessionState {
   /** 会话是否已开始构建过 */
   built: boolean
   loading: boolean
+  /** 构建失败时的错误信息 */
+  error: string | null
   /** 当前会话针对的词书；null 表示全部已选词书混合 */
   scope: string | null
 }
@@ -38,6 +42,8 @@ export interface AppState {
   states: Record<string, WordState>
   logs: Record<string, DailyLog>
   customBooks: CustomBook[]
+  /** 拼写练习列表 */
+  spellList: SpellItem[]
   manifest: BookMeta[]
   books: Record<string, BookData>
   session: SessionState
@@ -64,6 +70,7 @@ const emptySession: SessionState = {
   revealed: false,
   built: false,
   loading: false,
+  error: null,
   scope: null,
 }
 
@@ -81,6 +88,7 @@ class AppStore {
     states: {},
     logs: {},
     customBooks: [],
+    spellList: [],
     manifest: [],
     books: {},
     session: emptySession,
@@ -147,11 +155,12 @@ class AppStore {
 
   /** 按当前命名空间载入账号数据 */
   private async loadUserData(user: AuthUser | null) {
-    const [settings, logs, customBooks, stateMap] = await Promise.all([
+    const [settings, logs, customBooks, stateMap, spellList] = await Promise.all([
       this.driver.get<Settings>(this.keys.settings),
       this.driver.get<Record<string, DailyLog>>(this.keys.logs),
       this.driver.get<CustomBook[]>(this.keys.customBooks),
       this.driver.entries<WordState>(this.keys.statePrefix),
+      this.driver.get<SpellItem[]>(this.keys.spellList),
     ])
 
     const states: Record<string, WordState> = {}
@@ -173,6 +182,7 @@ class AppStore {
       settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) },
       logs: logs ?? {},
       customBooks: customBooks ?? [],
+      spellList: spellList ?? [],
       states,
       session: { ...emptySession },
     })
@@ -308,13 +318,25 @@ class AppStore {
     this.sessionBuilding = true
     try {
       await this.doRebuildSession(scope)
+    } catch (err) {
+      // 关键：无论哪一步失败，都不能让界面停在「加载中」
+      logger.error('session', '会话构建失败', err)
+      this.set({
+        session: {
+          ...emptySession,
+          built: true,
+          loading: false,
+          scope,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      })
     } finally {
       this.sessionBuilding = false
     }
   }
 
   private async doRebuildSession(scopeParam: string | null = null) {
-    this.set({ session: { ...emptySession, loading: true, built: true, scope: scopeParam } })
+    this.set({ session: { ...emptySession, loading: true, built: true, error: null, scope: scopeParam } })
     const { settings } = this.state
     const scope = parseScope(scopeParam)
     const now = Date.now()
@@ -338,7 +360,7 @@ class AppStore {
         范围: scopeParam,
         词数: built.length,
       })
-      this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, scope: scopeParam } })
+      this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, error: null, scope: scopeParam } })
       return
     }
 
@@ -448,7 +470,7 @@ class AppStore {
       队列总长: entries.length,
     })
 
-    this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, scope: scopeParam } })
+    this.set({ session: { entries, cursor: 0, revealed: false, built: true, loading: false, error: null, scope: scopeParam } })
   }
 
   /** 错词本：评过「没记得」或「困难」的词 */
@@ -695,6 +717,38 @@ class AppStore {
     await this.driver.set(this.keys.customBooks, customBooks)
     for (const [k] of toDelete) await this.driver.remove(k)
     logger.warn('import', '自建词书已删除', { id, 连带删除的学习记录: toDelete.length })
+  }
+
+  /* ------------------------------------------------------------ 拼写练习 */
+
+  isInSpellList(key: string) {
+    return this.state.spellList.some((s) => s.key === key)
+  }
+
+  async addToSpellList(key: string, word: RawWord) {
+    if (this.state.spellList.some((s) => s.key === key)) {
+      logger.debug('spell', '已在拼写列表中，跳过', { word: word.w })
+      return
+    }
+    const item: SpellItem = { key, word, addedAt: Date.now() }
+    const spellList = [...this.state.spellList, item]
+    this.set({ spellList })
+    await this.driver.set(this.keys.spellList, spellList)
+    logger.info('spell', '加入拼写列表', { word: word.w, 总数: spellList.length })
+  }
+
+  async removeFromSpellList(key: string) {
+    const spellList = this.state.spellList.filter((s) => s.key !== key)
+    this.set({ spellList })
+    await this.driver.set(this.keys.spellList, spellList)
+    logger.info('spell', '从拼写列表移除', { key, 剩余: spellList.length })
+  }
+
+  async clearSpellList() {
+    const count = this.state.spellList.length
+    this.set({ spellList: [] })
+    await this.driver.set(this.keys.spellList, [])
+    logger.warn('spell', '清空拼写列表', { 删除: count })
   }
 
   /* ------------------------------------------------------------ 统计与重置 */

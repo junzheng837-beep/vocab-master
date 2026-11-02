@@ -166,6 +166,7 @@ export function makeKeys(prefix: string) {
     settings: `${prefix}cfg:settings`,
     logs: `${prefix}cfg:logs`,
     customBooks: `${prefix}cfg:customBooks`,
+    spellList: `${prefix}cfg:spellList`,
     statePrefix: `${prefix}state:`,
     state: (key: string) => `${prefix}state:${key}`,
   }
