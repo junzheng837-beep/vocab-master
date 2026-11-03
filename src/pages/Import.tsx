@@ -84,7 +84,13 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
     setSaved(null)
     logger.info('import', '开始识别单词', { 行数: parsed.length, 原始字符数: text.length })
     try {
-      const { hits: h, misses } = await lookupWords(parsed.map((p) => p.word))
+      const { hits: h, misses, failedLetters } = await lookupWords(parsed.map((p) => p.word))
+      if (failedLetters.length) {
+        // 分片没下全就别往下走，否则这些词会被当成「未收录」让用户白填一遍
+        throw new Error(
+          `词典没加载完整（${failedLetters.map((l) => l.toUpperCase()).join('、')} 开头），请检查网络后重试`
+        )
+      }
       setItems(parsed)
       setHits(h)
       const m: Record<string, string> = {}
@@ -101,7 +107,8 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
       })
     } catch (err) {
       logger.error('import', '识别过程出错', err)
-      alert('识别失败，请检查网络后重试。详情见调试日志。')
+      const msg = err instanceof Error ? err.message : '识别失败'
+      alert(`${msg}\n\n如果一直失败，可以稍后再试，或把要查的词发邮件给我。`)
     } finally {
       setBusy(false)
     }

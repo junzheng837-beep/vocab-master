@@ -59,145 +59,123 @@ export function wordKey(bookId: string, word: string) {
   return `${bookId}::${word.toLowerCase()}`
 }
 
-/* ---------------------------------------------------------------- 查词索引 */
+/* ---------------------------------------------------------------- 查词字典 */
 
-type LookupEntry = { p: string; t: [string, string][] }
-let lookupPromise: Promise<Record<string, LookupEntry>> | null = null
+/**
+ * 导入自定义词库时用的词典。
+ *
+ * 以前是 lookup.json（2MB）+ examples.json（8MB）两个大文件，不管用户要查几个词，
+ * 都得先把 8MB 的例句索引下完——弱网下要几分钟，界面一直停在「正在查词」，
+ * 看起来就像识别不出来。现在按首字母拆成 26 个小文件，粘的词是哪个字母开头就只下哪个。
+ */
 
-/** 懒加载查词索引，仅在导入自定义词库时触发 */
-export function loadLookup(): Promise<Record<string, LookupEntry>> {
-  if (!lookupPromise) {
-    lookupPromise = fetch(dataUrl('lookup.json'))
-      .then((r) => {
-        if (!r.ok) throw new Error('查词索引加载失败')
-        return r.json()
-      })
-      .catch((err) => {
-        lookupPromise = null
-        throw err
-      })
-  }
-  return lookupPromise
-}
-
-/** 例句 / 短语 / 词根索引，用于给自建词书补全例句 */
-export interface EnrichEntry {
+interface DictEntry {
+  /** 音标 */
+  ph?: string
+  /** 释义 */
+  t: [string, string][]
+  /** 例句 */
   s?: [string, string][]
+  /** 短语 */
   p?: [string, string][]
+  /** 词根词缀 */
   r?: [string, string, string][]
+  /** 近义词 */
   syn?: [string, string[]][]
 }
 
-let enrichPromise: Promise<Record<string, EnrichEntry>> | null = null
+const dictCache = new Map<string, Promise<Record<string, DictEntry>>>()
 
-export function loadEnrich(): Promise<Record<string, EnrichEntry>> {
-  if (!enrichPromise) {
-    enrichPromise = fetch(dataUrl('examples.json'))
-      .then((r) => {
-        if (!r.ok) throw new Error('例句索引加载失败')
-        return r.json()
-      })
-      .catch((err) => {
-        enrichPromise = null
-        throw err
-      })
-  }
-  return enrichPromise
+/** 单个字母的词典，带超时；失败返回空表，绝不让整个识别流程挂住 */
+function loadDictLetter(letter: string, timeoutMs = 15000): Promise<Record<string, DictEntry>> {
+  const cached = dictCache.get(letter)
+  if (cached) return cached
+
+  const task = (async () => {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      const res = await fetch(dataUrl(`dict/${letter}.json`), { signal: ctrl.signal })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as Record<string, DictEntry>
+      logger.debug('dict', '词典分片载入', { 字母: letter, 词数: Object.keys(data).length })
+      return data
+    } finally {
+      clearTimeout(timer)
+    }
+  })().catch((err) => {
+    logger.warn('dict', '词典分片加载失败', { letter, error: String(err) })
+    dictCache.delete(letter) // 允许下次重试
+    return {} as Record<string, DictEntry>
+  })
+
+  dictCache.set(letter, task)
+  return task
 }
 
-/** 把例句/短语/词根补到一个词条上（就地返回新对象） */
-export function applyEnrich(word: RawWord, enrich: Record<string, EnrichEntry>): RawWord {
-  const hit = enrich[word.w.toLowerCase()]
-  if (!hit) return word
-  return {
-    ...word,
-    s: word.s.length ? word.s : (hit.s ?? []),
-    p: word.p.length ? word.p : (hit.p ?? []),
-    r: word.r.length ? word.r : (hit.r ?? []),
-    syn: word.syn?.length ? word.syn : hit.syn,
-  }
+/** 词落在哪个分片：取前两个字母，只有一个字母的词就取那一个 */
+function bucketOf(word: string): string {
+  const w = word.trim().toLowerCase()
+  if (!/^[a-z]/.test(w)) return ''
+  return /^[a-z]{2}/.test(w) ? w.slice(0, 2) : w.slice(0, 1)
 }
 
-/** 在内置词库中查词，命中则返回可直接使用的词条（含例句） */
-export async function lookupWord(raw: string): Promise<RawWord | null> {
-  const word = raw.trim()
-  if (!word) return null
-  const [index, enrich] = await Promise.all([loadLookup(), loadEnrich().catch(() => ({}))])
-  const key = word.toLowerCase()
-  const hit = index[key]
-  if (!hit) return null
-  return applyEnrich(
-    {
-      w: word,
-      uk: hit.p,
-      us: hit.p,
-      t: hit.t,
-      s: [],
-      p: [],
-      r: [],
-    },
-    enrich
-  )
-}
-
-/** 批量查词，命中与未命中分开返回；命中的词会自动带上例句、短语、词根 */
+/**
+ * 批量查词：只加载这些词首字母对应的分片。
+ * failedLetters 非空说明有分片没下来，调用方应该提示用户重试，
+ * 否则那些词会被误判成「未收录」。
+ */
 export async function lookupWords(
   words: string[]
-): Promise<{ hits: Map<string, RawWord>; misses: string[] }> {
-  const index = await loadLookup()
-  // 例句索引较大，网络慢时最多等 15 秒，超时就用纯释义继续，不阻塞导入
-  const enrich = await Promise.race([
-    loadEnrich().catch(() => ({}) as Record<string, EnrichEntry>),
-    new Promise<Record<string, EnrichEntry>>((resolve) =>
-      setTimeout(() => {
-        logger.warn('dict', '例句索引加载超时，先只补释义')
-        resolve({})
-      }, 15000)
-    ),
-  ])
+): Promise<{ hits: Map<string, RawWord>; misses: string[]; failedLetters: string[] }> {
+  const cleaned = words.map((w) => w.trim()).filter(Boolean)
+  const letters = new Set<string>()
+  for (const w of cleaned) {
+    const l = bucketOf(w)
+    if (l) letters.add(l)
+  }
+
+  const failed: string[] = []
+  const maps = await Promise.all(
+    [...letters].map(async (l) => {
+      const map = await loadDictLetter(l)
+      if (!Object.keys(map).length) failed.push(l)
+      return map
+    })
+  )
+
+  const index: Record<string, DictEntry> = {}
+  for (const m of maps) Object.assign(index, m)
+
   const hits = new Map<string, RawWord>()
   const misses: string[] = []
-  for (const raw of words) {
-    const word = raw.trim()
-    if (!word) continue
-    const key = word.toLowerCase()
-    const hit = index[key]
-    if (hit) {
-      hits.set(
-        word,
-        applyEnrich(
-          {
-            w: word,
-            uk: hit.p,
-            us: hit.p,
-            t: hit.t,
-            s: [],
-            p: [],
-            r: [],
-          },
-          enrich
-        )
-      )
-    } else {
+  for (const word of cleaned) {
+    const hit = index[word.toLowerCase()]
+    if (!hit) {
       misses.push(word)
+      continue
     }
+    hits.set(word, {
+      w: word,
+      uk: hit.ph ?? '',
+      us: hit.ph ?? '',
+      t: hit.t ?? [],
+      s: hit.s ?? [],
+      p: hit.p ?? [],
+      r: hit.r ?? [],
+      ...(hit.syn ? { syn: hit.syn } : {}),
+    })
   }
-  return { hits, misses }
-}
 
-/** 模糊前缀搜索，用于手动补注释时的候选提示 */
-export async function searchLookup(prefix: string, limit = 8): Promise<string[]> {
-  const p = prefix.trim().toLowerCase()
-  if (p.length < 2) return []
-  const index = await loadLookup()
-  const out: string[] = []
-  for (const k of Object.keys(index)) {
-    if (k.startsWith(p)) {
-      out.push(k)
-      if (out.length >= limit) break
-    }
-  }
-  return out
+  logger.info('dict', '批量查词完成', {
+    词数: cleaned.length,
+    词典分片: [...letters],
+    命中: hits.size,
+    未收录: misses.length,
+    失败分片: failed,
+  })
+
+  return { hits, misses, failedLetters: failed }
 }
 
 /* ---------------------------------------------------------------- 词根 */
@@ -221,24 +199,6 @@ export function loadRoots(): Promise<RootEntry[]> {
       })
   }
   return rootsPromise
-}
-
-/** 直接用查词索引 + 例句索引拼出词条，不依赖具体词书 */
-export async function wordsFromLookup(words: string[]): Promise<RawWord[]> {
-  const [index, enrich] = await Promise.all([loadLookup(), loadEnrich().catch(() => ({}))])
-  const out: RawWord[] = []
-  for (const raw of words) {
-    const key = raw.trim().toLowerCase()
-    const hit = index[key]
-    if (!hit) continue
-    out.push(
-      applyEnrich(
-        { w: raw.trim(), uk: hit.p, us: hit.p, t: hit.t, s: [], p: [], r: [] },
-        enrich
-      )
-    )
-  }
-  return out
 }
 
 /* ------------------------------------------------------- 首字母 / 拼写库 */

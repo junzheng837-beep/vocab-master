@@ -2,7 +2,7 @@
 """
 词库构建脚本
 输入: data/raw/ 下的 ECDICT csv、wordroot.txt、kajweb 词书 zip
-输出: public/data/books/*.json, public/data/lookup.json, public/data/roots.json
+输出: public/data/books/*.json, public/data/dict/*.json, public/data/roots.json
 """
 import csv, json, os, re, zipfile, sys, io
 from collections import OrderedDict
@@ -439,9 +439,12 @@ def main():
     if missing:
         print('    缺失词: %s' % ', '.join(missing[:40]))
 
-    # ---- 查词索引（导入自定义词库时自动补音标和释义）
-    print('[*] 构建查词索引 ...')
-    lookup = {}
+    # ---- 查词字典（导入自定义词库时用）
+    # 以前是 lookup.json + examples.json 两个大文件（合计 10MB），导入时不管查几个词
+    # 都要先下完 8MB 的例句索引，弱网下直接卡死。现在按首字母拆成 26 个小文件，
+    # 用户粘的词是哪个字母开头就只下哪个。
+    print('[*] 构建查词字典 ...')
+    dict_all = {}
     for key, meta in ecdict.items():
         rank = meta['frq'] or meta['bnc'] or 0
         keep = ('cet4' in meta['tags'] or 'cet6' in meta['tags'] or 'ky' in meta['tags']
@@ -449,26 +452,19 @@ def main():
                 or (rank and rank <= 25000) or meta['collins'] >= 3)
         if not keep or not meta['trans']:
             continue
-        lookup[key] = {
-            'p': meta['phonetic'],
-            't': [[p, c] for p, c in meta['trans'][:3]],
-        }
-    path = os.path.join(OUT, 'lookup.json')
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(lookup, f, ensure_ascii=False, separators=(',', ':'))
-    print('    lookup: %d 词, %.2f MB' % (len(lookup), os.path.getsize(path) / 1024 / 1024))
 
-    # ---- 例句/短语/词根索引（导入自定义单词时自动补全，解决自建词没有例句的问题）
-    print('[*] 构建例句索引 ...')
-    enrich = {}
-    for key, rec in kaj.items():
-        item = {}
-        if rec.get('s'):
-            item['s'] = rec['s']
-        if rec.get('p'):
-            item['p'] = rec['p']
-        if rec.get('syn'):
-            item['syn'] = rec['syn']
+        item = {
+            'ph': fix_phonetic(meta['phonetic']),
+            't': [[a, b] for a, b in meta['trans'][:3]],
+        }
+        rec = kaj.get(key)
+        if rec:
+            if rec.get('s'):
+                item['s'] = rec['s']
+            if rec.get('p'):
+                item['p'] = rec['p']
+            if rec.get('syn'):
+                item['syn'] = rec['syn']
         roots = []
         for r in word_to_roots.get(key, []):
             pair = [r['root'], r['meaning'], r['class']]
@@ -478,14 +474,40 @@ def main():
                 break
         if roots:
             item['r'] = roots
-        if item:
-            enrich[key] = item
-    path = os.path.join(OUT, 'examples.json')
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(enrich, f, ensure_ascii=False, separators=(',', ':'))
-    with_s = sum(1 for v in enrich.values() if v.get('s'))
-    print('    examples: %d 词, 其中有例句 %d, %.2f MB'
-          % (len(enrich), with_s, os.path.getsize(path) / 1024 / 1024))
+
+        dict_all[key] = item
+
+    dict_dir = os.path.join(OUT, 'dict')
+    os.makedirs(dict_dir, exist_ok=True)
+    # 清掉上一次构建留下的分片，避免改分片规则后新旧混在一起
+    for old in os.listdir(dict_dir):
+        if old.endswith('.json'):
+            os.remove(os.path.join(dict_dir, old))
+    # 清掉上一次构建留下的分片，避免改分片规则后新旧混在一起
+    for old in os.listdir(dict_dir):
+        if old.endswith('.json'):
+            os.remove(os.path.join(dict_dir, old))
+    # 按前两个字母分片：单字母最大能到 950KB，弱网下还是慢；
+    # 两字母后最大只有一百多 KB，导入几十个词通常只拉几百 KB
+    buckets = {}
+    for key, item in dict_all.items():
+        if 'a' <= key[:1] <= 'z':
+            buckets.setdefault(key[:2], {})[key] = item
+
+    total_bytes = 0
+    biggest = ('', 0)
+    for letter in sorted(buckets):
+        path = os.path.join(dict_dir, letter + '.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(buckets[letter], f, ensure_ascii=False, separators=(',', ':'))
+        size = os.path.getsize(path)
+        total_bytes += size
+        if size > biggest[1]:
+            biggest = (letter, size)
+    with_s = sum(1 for v in dict_all.values() if v.get('s'))
+    print('    dict: %d 词（%d 有例句）, %d 个分片, 合计 %.2f MB, 最大 %s %.0f KB'
+          % (len(dict_all), with_s, len(buckets), total_bytes / 1024 / 1024,
+             biggest[0].upper(), biggest[1] / 1024))
 
     # ---- 词根索引（词根词缀专项用）
     print('[*] 构建词根索引 ...')

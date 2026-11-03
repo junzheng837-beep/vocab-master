@@ -131,7 +131,7 @@ public/data/      构建产出的词库数据
 python data/build_dict.py
 ```
 
-产物写入 `public/data/`：`books/*.json`（词书）、`manifest.json`（清单）、`lookup.json`（2.6 万词查词索引）、`examples.json`（例句/短语/词根，给自建词补全用）、`roots.json`（605 个词根词缀及例词）。
+产物写入 `public/data/`：`books/*.json`（词书）、`manifest.json`（清单）、`dict/<两字母>.json`（2.6 万词查词字典，按前两个字母分片，导入时按需加载）、`roots.json`（605 个词根词缀及例词）、`spell.json`（拼写库）、`letters/*.json`（首字母库）。
 常见词根的中文释义维护在 `data/root_cn.py`。
 
 ## 数据与账号说明
