@@ -933,10 +933,6 @@ textarea.input {
   cursor: default;
 }
 
-.reveal-zone.is-revealed {
-  cursor: default;
-}
-
 .reveal-hint {
   display: flex;
   flex-direction: column;
@@ -947,15 +943,7 @@ textarea.input {
   padding: 26px 0;
   transition: color 0.2s;
 }
-.reveal-zone:hover .reveal-zone.is-revealed {
-  cursor: default;
-}
-
-.reveal-zone.is-revealed {
-  cursor: default;
-}
-
-.reveal-hint {
+.reveal-zone:hover .reveal-hint {
   color: var(--text-secondary);
 }
 .reveal-hint .kbd {
