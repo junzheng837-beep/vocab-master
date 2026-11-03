@@ -86,22 +86,32 @@ interface DictEntry {
 
 const dictCache = new Map<string, Promise<Record<string, DictEntry>>>()
 
-/** 单个字母的词典，带超时；失败返回空表，绝不让整个识别流程挂住 */
+async function fetchShard(letter: string, timeoutMs: number): Promise<Record<string, DictEntry>> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const res = await fetch(dataUrl(`dict/${letter}.json`), { signal: ctrl.signal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = (await res.json()) as Record<string, DictEntry>
+    logger.debug('dict', '词典分片载入', { 字母: letter, 词数: Object.keys(data).length })
+    return data
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** 单个分片的词典，带超时和一次自动重试；彻底失败返回空表，绝不让识别流程挂住 */
 function loadDictLetter(letter: string, timeoutMs = 15000): Promise<Record<string, DictEntry>> {
   const cached = dictCache.get(letter)
   if (cached) return cached
 
   const task = (async () => {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
     try {
-      const res = await fetch(dataUrl(`dict/${letter}.json`), { signal: ctrl.signal })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as Record<string, DictEntry>
-      logger.debug('dict', '词典分片载入', { 字母: letter, 词数: Object.keys(data).length })
-      return data
-    } finally {
-      clearTimeout(timer)
+      return await fetchShard(letter, timeoutMs)
+    } catch (err) {
+      // 弱网下第一次容易超时，再试一次往往就好了
+      logger.warn('dict', '词典分片首次加载失败，重试', { letter, error: String(err) })
+      return await fetchShard(letter, timeoutMs)
     }
   })().catch((err) => {
     logger.warn('dict', '词典分片加载失败', { letter, error: String(err) })

@@ -119,6 +119,11 @@ export default function App() {
       logger.debug('app', '学习页已带范围，跳过默认计划构建', { scope: route.param })
       return
     }
+    // 导入页要用词典，别让预热会话的词书下载抢带宽
+    if (route.page === 'import') {
+      logger.debug('app', '导入页跳过默认计划构建')
+      return
+    }
     logger.info('app', '首次进入，自动准备今日计划')
     void store.rebuildSession(null)
   }, [state.ready, state.session.built, state.settings.activeBooks.length, route.page, route.param])
