@@ -1,5 +1,5 @@
 import { store, useAppState } from '../core/store'
-import { speechSupported, speak } from '../core/speech'
+import { isWeChatBrowser, speechSupported, speak } from '../core/speech'
 import type { PageId } from '../components/Sidebar'
 import AboutCard from '../components/AboutCard'
 
@@ -74,7 +74,9 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
           <div style={{ flex: 1 }}>
             <div className="card-title">显示释义后自动发音</div>
             <div className="card-desc">
-              使用系统语音朗读单词{speechSupported() ? '' : '（当前浏览器不支持语音）'}
+              {isWeChatBrowser()
+                ? '微信里使用在线音频发音，需要联网'
+                : `使用系统语音朗读单词${speechSupported() ? '' : '（当前浏览器不支持语音）'}`}
             </div>
           </div>
           <button
@@ -172,7 +174,9 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
         <div className="list-item">
           <div style={{ flex: 1 }}>
             <div className="card-title">试听发音</div>
-            <div className="card-desc">确认系统的英文语音是否正常</div>
+            <div className="card-desc">
+              {isWeChatBrowser() ? '微信里走在线音频，点一下试试' : '确认系统的英文语音是否正常'}
+            </div>
           </div>
           <button className="btn" onClick={() => speak('vocabulary')}>
             朗读 vocabulary
