@@ -321,6 +321,8 @@ export default function StudyView({ scope }: { scope: string }) {
                       <button
                         className="icon-btn"
                         style={{ width: 22, height: 22 }}
+                        title="朗读英式发音"
+                        aria-label="朗读英式发音"
                         onClick={(e) => {
                           e.stopPropagation()
                           speak(entry.word.w, 'uk')
@@ -336,6 +338,8 @@ export default function StudyView({ scope }: { scope: string }) {
                       <button
                         className="icon-btn"
                         style={{ width: 22, height: 22 }}
+                        title="朗读美式发音"
+                        aria-label="朗读美式发音"
                         onClick={(e) => {
                           e.stopPropagation()
                           speak(entry.word.w, 'us')

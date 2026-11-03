@@ -5,6 +5,7 @@ import Sidebar, { type PageId } from './components/Sidebar'
 import MobileNav from './components/MobileNav'
 import { useDevice } from './core/device'
 import UpdateBanner from './components/UpdateBanner'
+import SpeechHint from './components/SpeechHint'
 import HomePage from './pages/Home'
 import StudyHome from './pages/StudyHome'
 import StudyPage from './pages/Study'
@@ -202,6 +203,8 @@ export default function App() {
       {isMobile && !inSession && (
         <MobileNav page={page} onNavigate={(p) => navigate(`/${p}`)} />
       )}
+
+      <SpeechHint />
     </div>
   )
 }
