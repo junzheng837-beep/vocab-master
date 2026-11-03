@@ -303,7 +303,10 @@ export default function StudyView({ scope }: { scope: string }) {
           </div>
         </div>
 
-        <div className="reveal-zone" onClick={reveal}>
+        <div
+          className={`reveal-zone${revealed ? ' is-revealed' : ''}`}
+          onClick={revealed ? undefined : reveal}
+        >
           {!revealed ? (
             <div className="reveal-hint">
               <span>点击此处查看释义</span>

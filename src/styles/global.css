@@ -91,6 +91,8 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* 关掉安卓/iOS 默认的整块蓝色点击高亮，反馈交给下面的 :active 自己做 */
+  -webkit-tap-highlight-color: transparent;
 }
 
 html,
@@ -927,6 +929,14 @@ textarea.input {
   position: relative;
 }
 
+.reveal-zone.is-revealed {
+  cursor: default;
+}
+
+.reveal-zone.is-revealed {
+  cursor: default;
+}
+
 .reveal-hint {
   display: flex;
   flex-direction: column;
@@ -937,7 +947,15 @@ textarea.input {
   padding: 26px 0;
   transition: color 0.2s;
 }
-.reveal-zone:hover .reveal-hint {
+.reveal-zone:hover .reveal-zone.is-revealed {
+  cursor: default;
+}
+
+.reveal-zone.is-revealed {
+  cursor: default;
+}
+
+.reveal-hint {
   color: var(--text-secondary);
 }
 .reveal-hint .kbd {
@@ -2487,6 +2505,72 @@ textarea.input {
   color: var(--text-tertiary);
 }
 
+/* ==========================================================================
+   按压反馈
+   移动端默认的 tap highlight 会把整个容器涂成一片蓝，很难看。
+   这里关掉它，只给真正能点的控件加一点按下去的手感。
+   ========================================================================== */
+
+.btn:active:not(:disabled),
+.rate-btn:active:not(:disabled),
+.letter-tile:active,
+.icon-btn:active,
+.preview-link:active,
+.mnav-item:active,
+.nav-item:active,
+.segmented-item:active,
+.book-card:active,
+.root-card:active,
+.spell-hint-btn:active {
+  transform: scale(0.97);
+}
+.btn-primary:active:not(:disabled) {
+  filter: brightness(0.93);
+}
+.icon-btn:active,
+.preview-link:active,
+.mnav-item:active,
+.nav-item:active {
+  background-color: rgba(127, 127, 127, 0.12);
+}
+.book-card:active,
+.root-card:active {
+  transform: none;
+  filter: brightness(0.97);
+}
+/* ==========================================================================
+   按压反馈
+   移动端默认的 tap highlight 会把整个容器涂成一片蓝，很难看。
+   这里关掉它，只给真正能点的控件加一点按下去的手感。
+   ========================================================================== */
+
+.btn:active:not(:disabled),
+.rate-btn:active:not(:disabled),
+.letter-tile:active,
+.icon-btn:active,
+.preview-link:active,
+.mnav-item:active,
+.nav-item:active,
+.segmented-item:active,
+.book-card:active,
+.root-card:active,
+.spell-hint-btn:active {
+  transform: scale(0.97);
+}
+.btn-primary:active:not(:disabled) {
+  filter: brightness(0.93);
+}
+.icon-btn:active,
+.preview-link:active,
+.mnav-item:active,
+.nav-item:active {
+  background-color: rgba(127, 127, 127, 0.12);
+}
+.book-card:active,
+.root-card:active {
+  transform: none;
+  filter: brightness(0.97);
+}
 /* ==========================================================================
    发音失败提示
    ========================================================================== */
