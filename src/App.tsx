@@ -106,11 +106,17 @@ export default function App() {
 
   // 首次进入后自动准备今日计划
   useEffect(() => {
-    if (state.ready && !state.session.built && state.settings.activeBooks.length) {
-      logger.info('app', '首次进入，自动准备今日计划')
-      void store.rebuildSession(null)
+    if (!state.ready || state.session.built) return
+    if (!state.settings.activeBooks.length) return
+    // 直接落在某个范围的学习页时，交给学习页自己按范围构建，
+    // 否则会先白拉一遍全部词书（弱网下能差几十秒）
+    if (route.page === 'study' && route.param) {
+      logger.debug('app', '学习页已带范围，跳过默认计划构建', { scope: route.param })
+      return
     }
-  }, [state.ready, state.session.built, state.settings.activeBooks.length])
+    logger.info('app', '首次进入，自动准备今日计划')
+    void store.rebuildSession(null)
+  }, [state.ready, state.session.built, state.settings.activeBooks.length, route.page, route.param])
 
   if (!state.ready) {
     return (

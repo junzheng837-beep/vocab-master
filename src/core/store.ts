@@ -308,31 +308,51 @@ class AppStore {
   /* ------------------------------------------------------------ 会话 */
 
   private sessionBuilding = false
+  /** 构建期间又来了新的范围请求，排队等当前这次结束后再按最新范围重建 */
+  private queuedScope: { value: string | null } | null = null
 
   async rebuildSession(scope: string | null = null) {
-    // StrictMode 下 effect 会连跑两次，避免重复构建
+    // 正在构建时不丢弃请求，记下最新范围，等这一轮结束后补跑
     if (this.sessionBuilding) {
-      logger.debug('session', '会话正在构建中，跳过本次重复调用', { scope })
+      this.queuedScope = { value: scope }
+      logger.debug('session', '会话正在构建中，排队等待最新范围', { scope })
       return
     }
     this.sessionBuilding = true
     try {
-      await this.doRebuildSession(scope)
-    } catch (err) {
-      // 关键：无论哪一步失败，都不能让界面停在「加载中」
-      logger.error('session', '会话构建失败', err)
-      this.set({
-        session: {
-          ...emptySession,
-          built: true,
-          loading: false,
-          scope,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      })
+      let current: string | null = scope
+      for (;;) {
+        this.queuedScope = null
+        try {
+          await this.doRebuildSession(current)
+        } catch (err) {
+          // 关键：无论哪一步失败，都不能让界面停在「加载中」
+          logger.error('session', '会话构建失败', err)
+          this.set({
+            session: {
+              ...emptySession,
+              built: true,
+              loading: false,
+              scope: current,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          })
+        }
+        const queued = this.takeQueuedScope()
+        if (!queued) break
+        logger.info('session', '按排队的最新范围重建会话', { scope: queued.value })
+        current = queued.value
+      }
     } finally {
       this.sessionBuilding = false
     }
+  }
+
+  /** 取出排队中的范围，取的同时清空，避免重复构建 */
+  private takeQueuedScope(): { value: string | null } | null {
+    const queued = this.queuedScope
+    this.queuedScope = null
+    return queued
   }
 
   private async doRebuildSession(scopeParam: string | null = null) {
