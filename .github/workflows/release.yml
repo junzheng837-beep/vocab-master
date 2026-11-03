@@ -38,6 +38,10 @@ jobs:
 
       - name: Build web app and site
         run: npm run build
+        env:
+          # 云同步配置从仓库 Secrets 注入，.env.local 不进仓库
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Build Windows installer
         run: npx electron-builder --win --publish never
