@@ -1,59 +1,191 @@
 import { useEffect, useMemo, useState } from 'react'
 import { store, useAppState } from '../core/store'
+import { loadSpellLibraries } from '../core/dict'
 import { speak } from '../core/speech'
 import { shuffle } from '../core/utils'
 import { logger } from '../core/logger'
-import type { RawWord } from '../core/types'
-import { IconSpeaker, IconSparkle, IconTrash } from '../components/Icons'
+import type { RawWord, SpellLibWord, SpellLibrary } from '../core/types'
+import { IconBooks, IconSpeaker, IconSparkle, IconTrash } from '../components/Icons'
 
-const HINT_LABELS = ['提示', '再提示', '直接看答案']
+const HINT_LABELS = ['提示前缀', '提示后缀', '直接看答案']
 
-/** 把单词按提示等级遮罩，返回逐字数组（非字母原样显示） */
-function maskWord(word: string, level: number): string[] {
+interface Affix {
+  /** 展示用，如「pre-（在前）」 */
+  label: string
+  /** 实际匹配到的字母，用于遮罩时保留 */
+  part: string
+}
+
+/** 词根表里的写法五花八门（-al2、con-、-ance, -ence），统一成能匹配的纯字母 */
+function normalizeAffix(raw: string): string {
+  return raw.replace(/\d+/g, '').replace(/[^a-zA-Z]/g, '').toLowerCase()
+}
+
+function prettyAffix(raw: string): string {
+  return raw.replace(/\d+/g, '').trim()
+}
+
+/** 从词根词缀数据里找能匹配词首的前缀 */
+function prefixOf(word: RawWord): Affix | null {
+  const w = word.w.toLowerCase()
+  for (const [root, meaning, cls] of word.r) {
+    if (!cls.includes('前缀')) continue
+    for (const raw of root.split(/[,\s]+/)) {
+      const part = normalizeAffix(raw)
+      if (part.length < 2 || !w.startsWith(part)) continue
+      return { label: `${prettyAffix(raw)}${shortMeaning(meaning)}`, part }
+    }
+  }
+  return null
+}
+
+/** 从词根词缀数据里找能匹配词尾的后缀 */
+function suffixOf(word: RawWord): Affix | null {
+  const w = word.w.toLowerCase()
+  for (const [root, meaning, cls] of word.r) {
+    if (!cls.includes('后缀')) continue
+    for (const raw of root.split(/[,\s]+/)) {
+      const part = normalizeAffix(raw)
+      if (part.length < 2 || !w.endsWith(part)) continue
+      return { label: `${prettyAffix(raw)}${shortMeaning(meaning)}`, part }
+    }
+  }
+  return null
+}
+
+/** 释义只取一小段，避免提示里塞一大段英文解释 */
+function shortMeaning(meaning: string): string {
+  const first = meaning.split(/[;；]/)[0].trim()
+  if (!first) return ''
+  const isCn = /[\u4e00-\u9fa5]/.test(first)
+  const label = isCn
+    ? first.split(/,/)[0].trim()
+    : first.split(/\s+/).slice(0, 3).join(' ').replace(/[,;:.]+$/, '')
+  return label ? `（${label}）` : ''
+}
+
+/** 按提示等级遮罩单词：1 露前缀，2 露前缀+后缀，3 全露 */
+function maskWord(
+  word: string,
+  level: number,
+  prefixLen: number,
+  suffixLen: number
+): string[] {
   const chars = [...word]
   const letters = chars.map((c, i) => ({ c, i })).filter((x) => /[a-zA-Z]/.test(x.c))
   const visible = new Set<number>()
+
   if (level >= 3) {
     letters.forEach((x) => visible.add(x.i))
-  } else if (level === 1) {
-    if (letters[0]) visible.add(letters[0].i)
   } else if (level === 2) {
-    if (letters[0]) visible.add(letters[0].i)
-    if (letters[1]) visible.add(letters[1].i)
-    if (letters.length > 2) visible.add(letters[letters.length - 1].i)
+    if (prefixLen > 0 || suffixLen > 0) {
+      letters.slice(0, prefixLen).forEach((x) => visible.add(x.i))
+      letters.slice(Math.max(prefixLen, letters.length - suffixLen)).forEach((x) => visible.add(x.i))
+    } else {
+      if (letters[0]) visible.add(letters[0].i)
+      if (letters.length > 1) visible.add(letters[letters.length - 1].i)
+    }
+  } else if (level === 1) {
+    if (prefixLen > 0) {
+      letters.slice(0, prefixLen).forEach((x) => visible.add(x.i))
+    } else if (letters[0]) {
+      visible.add(letters[0].i)
+    }
   }
+
   return chars.map((c, i) => {
     if (!/[a-zA-Z]/.test(c)) return c
     return visible.has(i) ? c : '_'
   })
 }
 
-/** 找这个词的后缀，用于第一次提示 */
-function suffixHint(word: RawWord): string | null {
-  const w = word.w.toLowerCase()
-  for (const [root, meaning, cls] of word.r) {
-    if (!cls.includes('后缀')) continue
-    for (const part of root.split(/[,\s]+/)) {
-      const clean = part.replace(/^-/, '').toLowerCase()
-      if (clean.length < 2 || !w.endsWith(clean)) continue
-      // 释义只取第一小段，英文释义过长时截断
-      const short = meaning.split(/[;；]/)[0].split(/,/)[0].trim()
-      const label = /[\u4e00-\u9fa5]/.test(short) ? short : short.slice(0, 14)
-      return label ? `${part}（${label}）` : part
-    }
-  }
-  return null
+function toRaw(w: SpellLibWord): RawWord {
+  return { w: w.w, uk: w.p, us: w.p, t: w.t, s: [], p: [], r: w.r ?? [] }
 }
 
-function hintText(word: RawWord, level: number): string {
-  if (level === 0) return ''
-  if (level === 1) {
-    const first = [...word.w].find((c) => /[a-zA-Z]/.test(c)) ?? ''
-    const suf = suffixHint(word)
-    return `以 ${first.toUpperCase()} 开头，共 ${word.w.length} 个字母${suf ? `；后缀是 ${suf}` : ''}`
+/** 拼写库选择面板：整本加入拼写练习 */
+function LibraryPicker({ onAdded }: { onAdded: (msg: string) => void }) {
+  const [libs, setLibs] = useState<SpellLibrary[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    loadSpellLibraries()
+      .then((d) => {
+        if (alive) setLibs(d)
+      })
+      .catch((e) => {
+        if (alive) setError(e instanceof Error ? e.message : '拼写库加载失败')
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  async function add(lib: SpellLibrary, words: SpellLibWord[], label: string) {
+    setBusy(true)
+    try {
+      const n = await store.addManyToSpellList(lib.id, words.map(toRaw))
+      onAdded(n ? `已加入 ${n} 个单词（${label}）` : '这些单词已经在拼写列表里了')
+    } finally {
+      setBusy(false)
+    }
   }
-  if (level === 2) return '已给出前两个字母和最后一个字母'
-  return '完整单词已给出，跟着打一遍加深印象'
+
+  if (error) {
+    return <div className="card-desc" style={{ color: 'var(--red)' }}>{error}</div>
+  }
+
+  return (
+    <div className="lib-picker">
+      <button className="lib-picker-head" onClick={() => setOpen((v) => !v)}>
+        <IconBooks size={15} />
+        <span>从拼写库添加</span>
+        <span className="tiny" style={{ color: 'var(--text-tertiary)' }}>
+          {libs.length ? `${libs.length} 个词库可选` : '加载中…'}
+        </span>
+        <span className={`lib-picker-arrow ${open ? 'open' : ''}`}>›</span>
+      </button>
+
+      {open && (
+        <div className="lib-list">
+          {libs.map((lib) => (
+            <div className="lib-item" key={lib.id}>
+              <div className="lib-item-main">
+                <div className="lib-item-name">{lib.name}</div>
+                <div className="lib-item-desc">{lib.desc}</div>
+                <div className="lib-item-groups">
+                  {lib.groups.map((g) => (
+                    <button
+                      key={g.name}
+                      className="group-chip"
+                      disabled={busy}
+                      onClick={() => void add(lib, lib.words.slice(g.start, g.start + g.count), g.name)}
+                    >
+                      {g.name}
+                      <span className="group-chip-num">{g.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="lib-item-side">
+                <div className="lib-item-count">{lib.words.length} 词</div>
+                <button
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => void add(lib, lib.words, lib.name)}
+                >
+                  全部加入
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function SpellPage() {
@@ -65,6 +197,7 @@ export default function SpellPage() {
   const [input, setInput] = useState('')
   const [hint, setHint] = useState(0)
   const [result, setResult] = useState<'idle' | 'correct' | 'wrong'>('idle')
+  const [notice, setNotice] = useState('')
 
   const total = spellList.length
 
@@ -80,10 +213,41 @@ export default function SpellPage() {
   const item = order.length ? spellList[order[pos]] : undefined
   const word = item?.word
 
+  // 前缀 / 后缀只算一次，遮罩和提示文案共用
+  const affix = useMemo(() => {
+    if (!word) return { pre: null as Affix | null, suf: null as Affix | null }
+    return { pre: prefixOf(word), suf: suffixOf(word) }
+  }, [word])
+
   const masked = useMemo(
-    () => (word ? maskWord(word.w, result === 'correct' ? 3 : hint) : []),
-    [word, hint, result]
+    () =>
+      word
+        ? maskWord(
+            word.w,
+            result === 'correct' ? 3 : hint,
+            affix.pre?.part.length ?? 0,
+            affix.suf?.part.length ?? 0
+          )
+        : [],
+    [word, hint, result, affix]
   )
+
+  const hintText = useMemo(() => {
+    if (!word || hint === 0) return ''
+    const first = [...word.w].find((c) => /[a-zA-Z]/.test(c))?.toUpperCase() ?? ''
+    const letters = word.w.replace(/[^a-zA-Z]/g, '').length
+    if (hint === 1) {
+      return affix.pre
+        ? `词根前缀是 ${affix.pre.label}，已给出这 ${affix.pre.part.length} 个字母`
+        : `这个词没有可拆的前缀，以 ${first} 开头，共 ${letters} 个字母`
+    }
+    if (hint === 2) {
+      return affix.suf
+        ? `后缀是 ${affix.suf.label}，已给出词尾这 ${affix.suf.part.length} 个字母`
+        : `没有可拆的后缀，已给出首尾字母，共 ${letters} 个字母`
+    }
+    return '完整单词已给出，跟着打一遍加深印象'
+  }, [word, hint, affix])
 
   function check() {
     if (!word) return
@@ -116,22 +280,38 @@ export default function SpellPage() {
 
   if (total === 0) {
     return (
-      <div className="empty">
-        <div className="empty-icon">
-          <IconSparkle size={24} />
+      <div className="page" style={{ maxWidth: 760 }}>
+        <div className="page-header">
+          <div className="page-title">拼写练习</div>
+          <div className="page-subtitle">
+            根据中文释义把单词完整拼出来 · 提示会先给词根前缀，再给后缀，最后才给答案
+          </div>
         </div>
-        <div className="empty-title">拼写列表还是空的</div>
-        <div className="empty-desc">
-          去背单词页面，把想练拼写的单词点「加入拼写」，它们就会出现在这里。
-          拼写时只给中文释义，你需要把单词完整拼出来。
+
+        <LibraryPicker
+          onAdded={(msg) => {
+            setNotice(msg)
+            setTimeout(() => setNotice(''), 2600)
+          }}
+        />
+        {notice && <div className="spell-notice">{notice}</div>}
+
+        <div className="empty" style={{ paddingTop: 40 }}>
+          <div className="empty-icon">
+            <IconSparkle size={24} />
+          </div>
+          <div className="empty-title">拼写列表还是空的</div>
+          <div className="empty-desc">
+            从上面的拼写库整本加入，或者去背单词页面，把想练拼写的单词点「加入拼写」。
+          </div>
+          <button
+            className="btn btn-primary"
+            style={{ marginTop: 6 }}
+            onClick={() => (window.location.hash = '/study')}
+          >
+            去背单词
+          </button>
         </div>
-        <button
-          className="btn btn-primary"
-          style={{ marginTop: 6 }}
-          onClick={() => (window.location.hash = '/study')}
-        >
-          去背单词
-        </button>
       </div>
     )
   }
@@ -182,9 +362,17 @@ export default function SpellPage() {
         </div>
       </div>
 
-      <div className="progress-track" style={{ height: 5, marginBottom: 26 }}>
+      <div className="progress-track" style={{ height: 5, marginBottom: 22 }}>
         <div className="progress-fill" style={{ width: `${(pos / order.length) * 100}%` }} />
       </div>
+
+      <LibraryPicker
+        onAdded={(msg) => {
+          setNotice(msg)
+          setTimeout(() => setNotice(''), 2600)
+        }}
+      />
+      {notice && <div className="spell-notice">{notice}</div>}
 
       <div className="spell-card">
         <div className="spell-cn">
@@ -257,9 +445,9 @@ export default function SpellPage() {
             >
               <IconSparkle size={13} />
               {HINT_LABELS[Math.min(hint, 2)]}
-              {hint > 0 && ` (${hint}/3)`}
+              {hint > 0 && `（已提示 ${hint} 次）`}
             </button>
-            {hint > 0 && <span className="spell-hint-text">{hintText(word!, hint)}</span>}
+            {hint > 0 && <span className="spell-hint-text">{hintText}</span>}
           </div>
         )}
       </div>

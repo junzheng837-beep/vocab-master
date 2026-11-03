@@ -1,4 +1,12 @@
-import type { BookData, BookMeta, RawWord, RootEntry } from './types'
+import type {
+  BookData,
+  BookMeta,
+  LetterIndexEntry,
+  LetterWord,
+  RawWord,
+  RootEntry,
+  SpellLibrary,
+} from './types'
 import { dataUrl } from './paths'
 import { logger, trace } from './logger'
 
@@ -231,4 +239,65 @@ export async function wordsFromLookup(words: string[]): Promise<RawWord[]> {
     )
   }
   return out
+}
+
+/* ------------------------------------------------------- 首字母 / 拼写库 */
+
+let letterIndexPromise: Promise<LetterIndexEntry[]> | null = null
+const letterCache = new Map<string, LetterWord[]>()
+
+export function loadLetterIndex(): Promise<LetterIndexEntry[]> {
+  if (!letterIndexPromise) {
+    letterIndexPromise = fetch(dataUrl('letters/index.json'))
+      .then((r) => {
+        if (!r.ok) throw new Error(`首字母索引加载失败（HTTP ${r.status}）`)
+        return r.json()
+      })
+      .then((d: { letters: LetterIndexEntry[] }) => {
+        logger.info('dict', '首字母索引载入', { 字母数: d.letters.length })
+        return d.letters
+      })
+      .catch((err) => {
+        letterIndexPromise = null
+        throw err
+      })
+  }
+  return letterIndexPromise
+}
+
+/** 单个字母的词表，每个文件只有几十 KB，点开哪个加载哪个 */
+export async function loadLetterWords(letter: string): Promise<LetterWord[]> {
+  const l = letter.slice(0, 1).toLowerCase()
+  const cached = letterCache.get(l)
+  if (cached) return cached
+  const res = await fetch(dataUrl(`letters/${l}.json`))
+  if (!res.ok) throw new Error(`首字母 ${l.toUpperCase()} 的数据加载失败（HTTP ${res.status}）`)
+  const data = (await res.json()) as { words: LetterWord[] }
+  letterCache.set(l, data.words)
+  logger.debug('dict', '首字母词表载入', { 字母: l, 词数: data.words.length })
+  return data.words
+}
+
+let spellLibPromise: Promise<SpellLibrary[]> | null = null
+
+export function loadSpellLibraries(): Promise<SpellLibrary[]> {
+  if (!spellLibPromise) {
+    spellLibPromise = fetch(dataUrl('spell.json'))
+      .then((r) => {
+        if (!r.ok) throw new Error(`拼写库加载失败（HTTP ${r.status}）`)
+        return r.json()
+      })
+      .then((d: { libraries: SpellLibrary[] }) => {
+        logger.info('dict', '拼写库载入', {
+          数量: d.libraries.length,
+          词数: d.libraries.map((x) => x.words.length),
+        })
+        return d.libraries
+      })
+      .catch((err) => {
+        spellLibPromise = null
+        throw err
+      })
+  }
+  return spellLibPromise
 }

@@ -1,11 +1,19 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { store, useAppState } from '../core/store'
 import type { PageId } from '../components/Sidebar'
+import BookPreview from '../components/BookPreview'
 import { IconCheck, IconPlus, IconTrash } from '../components/Icons'
+
+interface PreviewTarget {
+  id: string
+  name: string
+  custom?: boolean
+}
 
 export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
   const state = useAppState()
   const { manifest, customBooks, settings, states } = state
+  const [preview, setPreview] = useState<PreviewTarget | null>(null)
 
   const progress = useMemo(() => {
     const map: Record<string, number> = {}
@@ -91,8 +99,19 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                     <div className="book-desc">{b.desc}</div>
                     <div className="book-foot">
                       <span className={`tag ${b.tag === '高频' ? 'accent' : ''}`}>{b.tag}</span>
-                      <span>
-                        {learned} / {b.count} 词
+                      <span className="book-foot-right">
+                        <span>
+                          {learned} / {b.count} 词
+                        </span>
+                        <button
+                          className="preview-link"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setPreview({ id: b.id, name: b.name })
+                          }}
+                        >
+                          预览
+                        </button>
                       </span>
                     </div>
                     <button
@@ -166,8 +185,19 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                 <div className="book-desc">{b.desc || '自建词书'}</div>
                 <div className="book-foot">
                   <span className="tag">自建</span>
-                  <span>
-                    {learned} / {b.words.length} 词
+                  <span className="book-foot-right">
+                    <span>
+                      {learned} / {b.words.length} 词
+                    </span>
+                    <button
+                      className="preview-link"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPreview({ id: b.id, name: b.name, custom: true })
+                      }}
+                    >
+                      预览
+                    </button>
                   </span>
                 </div>
               </div>
@@ -182,8 +212,18 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           选中的词书会一起进入每日学习队列，新词在各词书之间轮流出现。
           四级、六级、考研三本存在重叠词汇（同一个词不会重复学习）。
           生活日常用语按「餐饮、出行、购物、居家」等 12 个场景分好组。
+          点任意词书右下角的「预览」，可以先翻一遍这本书里的全部单词再决定要不要学。
         </div>
       </div>
+
+      {preview && (
+        <BookPreview
+          bookId={preview.id}
+          name={preview.name}
+          custom={preview.custom}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   )
 }

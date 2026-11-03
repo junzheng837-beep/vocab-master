@@ -5,6 +5,7 @@ import {
   IconBooks,
   IconChart,
   IconHome,
+  IconLetter,
   IconPlus,
   IconSettings,
   IconSparkle,
@@ -23,6 +24,7 @@ export type PageId =
   | 'account'
   | 'roots'
   | 'spell'
+  | 'letters'
 
 interface Props {
   page: PageId
@@ -60,6 +62,7 @@ export default function Sidebar({ page, onNavigate }: Props) {
       badge: dueCount ? String(dueCount) : undefined,
     },
     { id: 'roots', label: '词根词缀', icon: <IconSparkle /> },
+    { id: 'letters', label: '首字母', icon: <IconLetter /> },
     {
       id: 'spell',
       label: '拼写练习',

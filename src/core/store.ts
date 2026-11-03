@@ -2,8 +2,8 @@ import { useSyncExternalStore } from 'react'
 import { createDriver, keysFor, type DataKeys, type StorageDriver } from './storage'
 import { LocalAuthProvider, type AuthUser } from './auth'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
-import { loadBook, loadRoots } from './dict'
-import { parseScope } from './scope'
+import { loadBook, loadLetterWords, loadRoots } from './dict'
+import { parseScope, type LetterSource } from './scope'
 import { shuffle } from './utils'
 import { dataUrl } from './paths'
 import { logger } from './logger'
@@ -350,13 +350,18 @@ class AppStore {
     }
     const newQuota = Math.max(0, settings.dailyNew - newToday)
 
-    /* ------------------------------------------------ 错词本 / 词根专项 */
-    if (scope.kind === 'wrong' || scope.kind === 'root') {
-      const built = scope.kind === 'wrong'
-        ? await this.buildWrongEntries()
-        : await this.buildRootEntries(scope.root)
+    /* ------------------------------------------------ 错词本 / 词根 / 首字母 */
+    if (scope.kind === 'wrong' || scope.kind === 'root' || scope.kind === 'letter') {
+      const built =
+        scope.kind === 'wrong'
+          ? await this.buildWrongEntries()
+          : scope.kind === 'root'
+            ? await this.buildRootEntries(scope.root)
+            : await this.buildLetterEntries(scope.letter, scope.source)
       entries.push(...built)
-      logger.info('session', scope.kind === 'wrong' ? '错词本已构建' : '词根专项已构建', {
+      const label =
+        scope.kind === 'wrong' ? '错词本' : scope.kind === 'root' ? '词根专项' : '首字母专项'
+      logger.info('session', `${label}已构建`, {
         范围: scopeParam,
         词数: built.length,
       })
@@ -521,6 +526,78 @@ class AppStore {
         bookId: `__root__:${root}`,
         word,
         isNew: false,
+        done: false,
+        retried: 0,
+      }
+    })
+  }
+
+  /** 首字母专项：公共词库 或 我学过的单词 */
+  private async buildLetterEntries(
+    letter: string,
+    source: LetterSource
+  ): Promise<SessionEntry[]> {
+    const l = letter.slice(0, 1).toLowerCase()
+    if (!/^[a-z]$/.test(l)) return []
+
+    /* ---------- 我学过的：直接用已有状态，评分会正常推进复习计划 ---------- */
+    if (source === 'learned') {
+      const picked = Object.values(this.state.states)
+        .filter((s) => s.stage !== 'new' && s.word.slice(0, 1).toLowerCase() === l)
+        .sort((a, b) => a.dueAt - b.dueAt)
+
+      const bookIds = [...new Set(picked.map((s) => s.bookId))]
+      await this.ensureBooks(
+        bookIds.filter((id) => !id.startsWith('custom:') && !id.startsWith('__'))
+      )
+
+      const out: SessionEntry[] = []
+      for (const s of picked) {
+        const book = this.bookData(s.bookId)
+        const word = book?.words.find((w) => w.w.toLowerCase() === s.word.toLowerCase())
+        if (!word) continue
+        out.push({
+          entryId: this.nextId('e'),
+          key: s.key,
+          bookId: s.bookId,
+          word,
+          isNew: false,
+          done: false,
+          retried: 0,
+        })
+      }
+      logger.info('session', '首字母（我学过的）词数', { 字母: l, 状态数: picked.length, 可背: out.length })
+      return out
+    }
+
+    /* ---------- 公共词库：按需加载单个字母的数据文件 ---------- */
+    const words = await loadLetterWords(l)
+    // 同一个词可能已经在别的词书里学过，复用它的状态，避免重复学习
+    const existingByWord = new Map<string, WordState>()
+    for (const s of Object.values(this.state.states)) {
+      const k = s.word.toLowerCase()
+      if (!existingByWord.has(k)) existingByWord.set(k, s)
+    }
+
+    return words.map((item) => {
+      const existing = existingByWord.get(item.w.toLowerCase())
+      const bookId = existing?.bookId ?? item.b
+      const key = existing?.key ?? `${bookId}::${item.w.toLowerCase()}`
+      const word: RawWord = {
+        w: item.w,
+        uk: item.p,
+        us: item.p,
+        t: item.t,
+        s: [],
+        p: [],
+        r: [],
+      }
+      return {
+        entryId: this.nextId('e'),
+        key,
+        bookId,
+        word,
+        isNew: !existing,
         done: false,
         retried: 0,
       }
@@ -752,6 +829,33 @@ class AppStore {
     this.set({ spellList })
     await this.driver.set(this.keys.spellList, spellList)
     logger.info('spell', '从拼写列表移除', { key, 剩余: spellList.length })
+  }
+
+  /** 整本拼写库一次加入，重复的自动跳过 */
+  async addManyToSpellList(libId: string, words: RawWord[]) {
+    const existing = new Set(this.state.spellList.map((s) => s.key))
+    const now = Date.now()
+    const added: SpellItem[] = []
+    for (const w of words) {
+      const key = `lib:${libId}::${w.w.toLowerCase()}`
+      if (existing.has(key)) continue
+      existing.add(key)
+      added.push({ key, word: w, addedAt: now })
+    }
+    if (!added.length) {
+      logger.info('spell', '拼写库整本加入：全部已存在', { libId, 请求: words.length })
+      return 0
+    }
+    const spellList = [...this.state.spellList, ...added]
+    this.set({ spellList })
+    await this.driver.set(this.keys.spellList, spellList)
+    logger.info('spell', '拼写库整本加入', {
+      libId,
+      新增: added.length,
+      跳过: words.length - added.length,
+      总数: spellList.length,
+    })
+    return added.length
   }
 
   async clearSpellList() {

@@ -9,11 +9,13 @@ from collections import OrderedDict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from root_cn import ROOT_CN
+from writing_words import WRITING_GROUPS
 
 csv.field_size_limit(10**9)
 RAW = os.path.join(os.path.dirname(__file__), 'raw')
 OUT = os.path.join(os.path.dirname(__file__), '..', 'public', 'data')
 os.makedirs(os.path.join(OUT, 'books'), exist_ok=True)
+os.makedirs(os.path.join(OUT, 'letters'), exist_ok=True)
 
 POS_RE = re.compile(r'^([a-z]+\.(?:\s*&\s*[a-z]+\.)?)\s*(.*)$')
 CLEAN_RE = re.compile(r'\s+')
@@ -351,8 +353,10 @@ def main():
 
     stats = {}
     daily_words = []
+    book_entries = {}
 
     def write_book(bid, name, desc, category, entries, extra=None):
+        book_entries[bid] = entries
         with_s = sum(1 for e in entries if e['s'])
         payload = {
             'id': bid, 'name': name, 'desc': desc,
@@ -506,6 +510,128 @@ def main():
         json.dump({'roots': root_payload}, f, ensure_ascii=False, separators=(',', ':'))
     print('    roots: %d 个词根, %.2f MB'
           % (len(root_payload), os.path.getsize(path) / 1024 / 1024))
+
+    # ---- 拼写库（拼写练习页可整本加入）
+    print('[*] 构建拼写库 ...')
+    spell_libs = []
+
+    def spell_roots(key):
+        """给拼写练习挑词根：优先保留能匹配词首/词尾的前缀和后缀，提示才有东西可给"""
+        cand = word_to_roots.get(key, [])
+        scored = []
+        for item in cand:
+            root = item['root']
+            hit = False
+            for part in re.split(r'[,\s]+', root):
+                p = part.strip()
+                if '前缀' in item['class'] and p.rstrip('-').lower() and key.startswith(p.rstrip('-').lower()):
+                    hit = True
+                if '后缀' in item['class'] and p.lstrip('-').lower() and key.endswith(p.lstrip('-').lower()):
+                    hit = True
+            scored.append((0 if hit else 1, item))
+        scored.sort(key=lambda x: x[0])
+        out = []
+        for _, item in scored:
+            pair = [item['root'], item['meaning'], item['class']]
+            if pair in out:
+                continue
+            out.append(pair)
+            if len(out) >= 3:
+                break
+        return out
+
+    writing_words = []
+    writing_groups = []
+    missing_writing = []
+    for group_name, words in WRITING_GROUPS:
+        start = len(writing_words)
+        for w in words:
+            meta = ecdict.get(w.lower())
+            if not meta or not meta['trans']:
+                missing_writing.append(w)
+                continue
+            if any(x['w'].lower() == w.lower() for x in writing_words[start:]):
+                continue
+            writing_words.append({
+                'w': meta['word'],
+                'p': meta['phonetic'],
+                't': [[a, b] for a, b in meta['trans'][:3]],
+                'r': spell_roots(w.lower()),
+                'g': group_name,
+            })
+        writing_groups.append({
+            'name': group_name,
+            'start': start,
+            'count': len(writing_words) - start,
+        })
+    spell_libs.append({
+        'id': 'writing_gaokao',
+        'name': '高中英语作文写作高频词',
+        'desc': '按 8 类作文表达整理：观点、因果、转折、递进、建议、程度、社会、态度',
+        'groups': writing_groups,
+        'words': writing_words,
+    })
+    if missing_writing:
+        print('    作文词缺失: %s' % ', '.join(missing_writing))
+
+    cet4_core_words = [
+        {'w': e['w'], 'p': e.get('uk') or e.get('us') or '', 't': e['t'][:3], 'r': e.get('r') or []}
+        for e in book_entries.get('cet4_core', [])
+    ]
+    with_affix = sum(1 for w in writing_words + cet4_core_words if w['r'])
+    print('    带词根词缀的词: %d / %d' % (with_affix, len(writing_words) + len(cet4_core_words)))
+    spell_libs.append({
+        'id': 'cet4_core',
+        'name': '四级高频词语',
+        'desc': '按实际使用频率精选的四级核心词，写作和阅读都用得上',
+        'groups': [],
+        'words': cet4_core_words,
+    })
+
+    path = os.path.join(OUT, 'spell.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump({'libraries': spell_libs}, f, ensure_ascii=False, separators=(',', ':'))
+    print('    spell: %d 个拼写库, %d 词, %.2f MB'
+          % (len(spell_libs), sum(len(x['words']) for x in spell_libs),
+             os.path.getsize(path) / 1024 / 1024))
+
+    # ---- 首字母索引（公共库）
+    # 同一单词在多本词书里重复出现时，保留最先出现的（越靠前的词书越基础）
+    print('[*] 构建首字母索引 ...')
+    by_letter = {}
+    seen_words = set()
+    total_letter_words = 0
+    for bid, _, _, _, _ in BOOKS:
+        for e in book_entries.get(bid, []):
+            key = e['w'].lower()
+            if key in seen_words:
+                continue
+            first = key[:1]
+            if not ('a' <= first <= 'z'):
+                continue
+            seen_words.add(key)
+            by_letter.setdefault(first, []).append({
+                'w': e['w'],
+                'b': bid,
+                'p': e.get('uk') or e.get('us') or '',
+                't': e['t'][:3],
+            })
+            total_letter_words += 1
+
+    letter_index = []
+    for letter in sorted(by_letter):
+        words = by_letter[letter]
+        payload = {'l': letter, 'count': len(words), 'words': words}
+        p = os.path.join(OUT, 'letters', letter + '.json')
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, separators=(',', ':'))
+        letter_index.append({'l': letter, 'count': len(words)})
+    with open(os.path.join(OUT, 'letters', 'index.json'), 'w', encoding='utf-8') as f:
+        json.dump({'letters': letter_index, 'total': total_letter_words},
+                  f, ensure_ascii=False, separators=(',', ':'))
+    biggest = max((len(v) for v in by_letter.values()), default=0)
+    print('    首字母索引: %d 个字母, %d 词, 最大单文件 %d 词'
+          % (len(letter_index), total_letter_words, biggest))
 
     # ---- 书单
     manifest = {

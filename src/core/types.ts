@@ -145,6 +145,40 @@ export interface SpellItem {
   addedAt: number
 }
 
+/** 拼写库里的一个词（结构比词条轻，够拼写练习用） */
+export interface SpellLibWord {
+  w: string
+  p: string
+  t: [string, string][]
+  /** 词根词缀，拼写提示用 */
+  r?: [string, string, string][]
+  /** 所属分组名（作文词专用） */
+  g?: string
+}
+
+/** 拼写库：可以整本加入拼写练习 */
+export interface SpellLibrary {
+  id: string
+  name: string
+  desc: string
+  groups: BookGroup[]
+  words: SpellLibWord[]
+}
+
+/** 首字母索引里的一个词 */
+export interface LetterWord {
+  w: string
+  /** 来源词书 id，学习时沿用这本书的记录，避免同一个词学两遍 */
+  b: string
+  p: string
+  t: [string, string][]
+}
+
+export interface LetterIndexEntry {
+  l: string
+  count: number
+}
+
 /** 会话中的一个条目 */
 export interface SessionEntry {
   entryId: string

@@ -38,6 +38,11 @@ export default function StudyView({ scope }: { scope: string }) {
     const parsed = parseScope(scope)
     if (parsed.kind === 'wrong') return '错词本'
     if (parsed.kind === 'root') return `词根 ${parsed.root}`
+    if (parsed.kind === 'letter') {
+      return `${parsed.letter.toUpperCase()} 开头 · ${
+        parsed.source === 'public' ? '公共词库' : '我学过的'
+      }`
+    }
     if (parsed.kind === 'book') {
       const name =
         state.manifest.find((m) => m.id === parsed.bookId)?.name ??
@@ -173,10 +178,20 @@ export default function StudyView({ scope }: { scope: string }) {
               title: '错词本是空的',
               desc: '等你把某些词评成「没记得」或「困难」，它们就会自动出现在这里。',
             }
-          : {
-              title: '今天没有要背的单词',
-              desc: '可能是所有到期单词都复习完了，或者你还没选择词书。去「词库」里挑一本，或者在「设置」里调整每天的新词数量。',
-            }
+          : parsed.kind === 'letter'
+            ? parsed.source === 'learned'
+              ? {
+                  title: `还没有背过 ${parsed.letter.toUpperCase()} 开头的单词`,
+                  desc: '先去背一些单词，这里会自动按首字母归类。',
+                }
+              : {
+                  title: `${parsed.letter.toUpperCase()} 开头没有可背的单词`,
+                  desc: '这个字母下暂时没有词条，换一个字母试试。',
+                }
+            : {
+                title: '今天没有要背的单词',
+                desc: '可能是所有到期单词都复习完了，或者你还没选择词书。去「词库」里挑一本，或者在「设置」里调整每天的新词数量。',
+              }
     return (
       <div className="empty">
         <div className="empty-icon">

@@ -170,3 +170,13 @@ export function IconSpell({ size = 17, className }: IconProps) {
     </svg>
   )
 }
+
+export function IconLetter({ size = 17, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M4 19 9.4 5h1.2L16 19" />
+      <path d="M6.4 14.6h7.2" />
+      <path d="M18.2 9.6v9.4" />
+    </svg>
+  )
+}
