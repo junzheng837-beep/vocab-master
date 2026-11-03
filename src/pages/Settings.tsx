@@ -1,6 +1,7 @@
 import { store, useAppState } from '../core/store'
 import { speechSupported, speak } from '../core/speech'
 import type { PageId } from '../components/Sidebar'
+import AboutCard from '../components/AboutCard'
 
 function Stepper({
   value,
@@ -239,24 +240,8 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
         </div>
       </div>
 
-      <div className="section-label">开发者</div>
-      <div className="list">
-        <div className="list-item">
-          <div style={{ flex: 1 }}>
-            <div className="card-title">调试日志</div>
-            <div className="card-desc">
-              查看应用内部每一步的执行记录，遇到问题时可以导出给开发者
-            </div>
-          </div>
-          <button className="btn" onClick={() => onNavigate('debug')}>
-            打开日志
-          </button>
-        </div>
-      </div>
-
-      <div className="card-desc" style={{ marginTop: 26, textAlign: 'center' }}>
-        单词 · 0.3 版 · 数据保存在本机浏览器
-      </div>
+      <div className="section-label">关于</div>
+      <AboutCard />
     </div>
   )
 }
