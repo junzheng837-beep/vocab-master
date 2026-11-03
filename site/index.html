@@ -354,7 +354,7 @@
         </svg>
         <span class="btn-label" id="dl-label">下载 Windows 版</span>
       </a>
-      <a class="btn btn-ghost" id="apk-btn" href="https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk">
+      <a class="btn btn-ghost" id="apk-btn" href="./download/shici-android.apk">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>
         </svg>
@@ -546,7 +546,7 @@
           </div>
         </div>
         <div class="dl-actions">
-          <a class="btn btn-primary" id="apk-btn-2" href="https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk">下载 APK</a>
+          <a class="btn btn-primary" id="apk-btn-2" href="./download/shici-android.apk">下载 APK</a>
           <div class="dl-note">Android 7.0 及以上，首次安装需允许未知来源</div>
         </div>
       </div>
@@ -575,7 +575,8 @@
   // 安装包文件名固定为 shici-setup.exe，因此可以直接用 latest/download 的永久链接，
   // 不依赖 GitHub API（未登录的 API 有每小时 60 次的限流）。
   var DIRECT = 'https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-setup.exe'
-  var APK = 'https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk'
+  // APK 走站点自己的域名（Fastly），国内比 release 资源稳
+  var APK = './download/shici-android.apk'
   var API = 'https://api.github.com/repos/junzheng837-beep/vocab-master/releases/latest'
 
   var meta = document.getElementById('hero-meta')
@@ -614,6 +615,16 @@
   bindDownload(btn2, DIRECT, 'shici-setup.exe')
   bindDownload(apkBtn, APK, 'shici-android.apk')
   bindDownload(apkBtn2, APK, 'shici-android.apk')
+
+  // 站点上的包由 CI 同步；万一还没同步过去，退回 GitHub 的地址
+  var APK_FALLBACK = 'https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk'
+  fetch(APK, { method: 'HEAD' })
+    .then(function (r) { if (!r.ok) throw new Error('missing') })
+    .catch(function () {
+      ;[apkBtn, apkBtn2].forEach(function (el) {
+        if (el) el.href = APK_FALLBACK
+      })
+    })
 
   function fmtSize(bytes) {
     if (!bytes) return '—'

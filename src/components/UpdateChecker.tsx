@@ -8,6 +8,7 @@ type Phase = 'idle' | 'checking' | 'latest' | 'found' | 'error'
 export default function UpdateChecker() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [info, setInfo] = useState<UpdateInfo | null>(null)
+  const [opening, setOpening] = useState(false)
   const version = currentVersion()
 
   // 进设置页时先用缓存结果标一下，不主动请求（顶部提示条已经在查了）
@@ -66,9 +67,15 @@ export default function UpdateChecker() {
         {phase === 'found' ? (
           <button
             className="btn btn-primary"
-            onClick={() => void openDownload(info?.downloadUrl)}
+            disabled={opening}
+            onClick={() => {
+              setOpening(true)
+              void openDownload(info?.downloadUrl).finally(() =>
+                window.setTimeout(() => setOpening(false), 1500)
+              )
+            }}
           >
-            下载 {info?.latest}
+            {opening ? '正在打开…' : `下载 ${info?.latest}`}
           </button>
         ) : (
           <button className="btn" disabled={phase === 'checking'} onClick={() => void check()}>

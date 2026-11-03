@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   # ---------------------------------------------------------------- 安卓 APK
@@ -137,3 +138,8 @@ jobs:
 
             词库和学习记录保存在本机。注册账号后，自建词库会归属该账号，
             切换账号互不影响。
+
+      - name: Refresh Pages with the new APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main

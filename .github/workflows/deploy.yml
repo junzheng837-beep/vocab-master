@@ -37,6 +37,17 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      # 把最新 APK 也放到站点上：GitHub 的 release 资源走 objects.githubusercontent.com，
+      # 国内经常卡住；Pages 走 Fastly，能打开站点的网络一般也能下这个包
+      - name: Attach latest APK
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist/download
+          gh release download --repo "${{ github.repository }}" --pattern "*.apk" --dir dist/download --clobber || true
+          ls -lh dist/download || true
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

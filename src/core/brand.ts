@@ -29,4 +29,12 @@ export const LATEST_RELEASE_URL = `${REPO_URL}/releases/latest`
 export const LATEST_API = `https://api.github.com/repos/${BRAND.repo}/releases/latest`
 /** 安装包直链：文件名固定，所以可以用 latest/download 的永久地址 */
 export const SETUP_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/shici-setup.exe`
-export const APK_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/shici-android.apk`
+/**
+ * APK 优先从站点下载。
+ * GitHub 的 release 资源走 objects.githubusercontent.com，国内经常卡在 0%；
+ * Pages 走 Fastly，能打开这个站点一般就能下这个包。
+ * 站点上的包由 CI 每次发版后同步过去。
+ */
+export const APK_DOWNLOAD_URL = `${BRAND.homepage}download/shici-android.apk`
+/** 站点上没有包时（比如刚建仓库还没发版）退回 GitHub */
+export const APK_DOWNLOAD_FALLBACK = `${REPO_URL}/releases/latest/download/shici-android.apk`
