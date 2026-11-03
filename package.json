@@ -1,7 +1,7 @@
 {
   "name": "shici",
   "private": true,
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "拾词易记 — 拾起每一个词，记得更久",
   "author": "junzheng837-beep",
   "type": "module",
@@ -16,7 +16,7 @@
     "electron:start": "electron .",
     "dist": "npm run build && electron-builder --win",
     "dist:dir": "npm run build && electron-builder --win --dir",
-    "android:assets": "capacitor-assets generate --android --assetPath resources",
+    "android:assets": "capacitor-assets generate --android --assetPath resources && node scripts/trim-android-assets.mjs",
     "android:sync": "npm run build && npx cap sync android",
     "android:apk": "node scripts/build-android.mjs"
   },
