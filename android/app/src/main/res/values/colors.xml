@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#0A84FF</color>
+    <color name="colorPrimaryDark">#0A84FF</color>
+    <color name="colorAccent">#0A84FF</color>
+
+    <!-- 状态栏 / 导航栏跟随系统深浅色，见 values-night/colors.xml -->
+    <color name="statusBar">#F7F7FA</color>
+    <color name="navBar">#FFFFFF</color>
+</resources>

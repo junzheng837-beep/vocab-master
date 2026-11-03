@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+  .wrap { width: 100vw; height: 100vh; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; gap: 42px;
+          background: linear-gradient(135deg, #0A84FF 0%, #5E5CE6 100%);
+          font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .logo { width: 380px; height: 380px; border-radius: 88px; overflow: hidden;
+          box-shadow: 0 26px 70px rgba(0, 0, 0, 0.28); }
+  .logo svg { display: block; width: 100%; height: 100%; }
+  .name { color: #fff; font-size: 68px; font-weight: 700; letter-spacing: 6px; }
+  .slogan { color: rgba(255, 255, 255, 0.72); font-size: 30px; letter-spacing: 3px; margin-top: -18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0A84FF"/>
+          <stop offset="100%" stop-color="#5E5CE6"/>
+        </linearGradient>
+      </defs>
+      <rect width="256" height="256" fill="url(#g)"/>
+      <rect x="62" y="150" width="132" height="46" rx="16" fill="#ffffff" opacity="0.34"/>
+      <rect x="52" y="110" width="152" height="52" rx="17" fill="#ffffff" opacity="0.62"/>
+      <rect x="42" y="62" width="172" height="66" rx="19" fill="#ffffff" opacity="0.97"/>
+      <rect x="66" y="84" width="76" height="9" rx="4.5" fill="#0A84FF" opacity="0.85"/>
+      <rect x="66" y="102" width="46" height="9" rx="4.5" fill="#0A84FF" opacity="0.42"/>
+      <path d="M158 92 l12 13 24 -27" fill="none" stroke="#0A84FF" stroke-width="9"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+    </svg>
+  </div>
+  <div class="name">拾词易记</div>
+  <div class="slogan">拾起每一个词，记得更久</div>
+</div>
+</body>
+</html>

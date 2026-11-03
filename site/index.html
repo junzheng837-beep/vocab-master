@@ -245,6 +245,33 @@
   }
 
   /* ---------- 下载 ---------- */
+  .download-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .download-card.compact {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 30px 28px;
+    gap: 20px;
+  }
+  .dl-badge {
+    display: inline-flex; align-items: center;
+    height: 22px; padding: 0 10px; margin-bottom: 12px;
+    border-radius: 999px;
+    background: rgba(10,132,255,0.14);
+    color: var(--accent);
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+  }
+  .dl-extra {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px; flex-wrap: wrap; margin-top: 20px;
+  }
+  .dl-extra .dl-note { text-align: left; }
+  @media (max-width: 820px) {
+    .download-grid { grid-template-columns: 1fr; }
+  }
   .download-card {
     background: linear-gradient(150deg, rgba(10,132,255,0.14), rgba(94,92,230,0.06) 55%, transparent);
     border: 1px solid rgba(10, 132, 255, 0.24);
@@ -326,6 +353,12 @@
           <path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
         </svg>
         <span class="btn-label" id="dl-label">下载 Windows 版</span>
+      </a>
+      <a class="btn btn-ghost" id="apk-btn" href="https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>
+        </svg>
+        <span class="btn-label" id="apk-label">下载安卓版</span>
       </a>
       <a class="btn btn-ghost" href="./app/">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -485,21 +518,43 @@
 
 <section id="download" style="padding-top: 0">
   <div class="wrap">
-    <div class="download-card">
-      <div class="left">
-        <h3>下载拾词易记</h3>
-        <p>Windows 桌面版，双击安装即可使用，离线也能背。安装包约 124 MB。</p>
-        <div class="dl-meta">
-          <span><span class="k">版本</span> <b id="dl-version">—</b></span>
-          <span><span class="k">系统</span> Windows 10 / 11 (64 位)</span>
-          <span><span class="k">大小</span> <b id="dl-size">—</b></span>
+    <div class="download-grid">
+      <div class="download-card compact">
+        <div class="left">
+          <div class="dl-badge">Windows</div>
+          <h3>桌面版</h3>
+          <p>双击安装即可使用，离线也能背，支持自动更新。</p>
+          <div class="dl-meta">
+            <span><span class="k">版本</span> <b id="dl-version">—</b></span>
+            <span><span class="k">大小</span> <b id="dl-size">—</b></span>
+          </div>
+        </div>
+        <div class="dl-actions">
+          <a class="btn btn-primary" id="dl-btn-2" href="https://github.com/junzheng837-beep/vocab-master/releases/latest">下载安装包</a>
+          <div class="dl-note">Windows 10 / 11 (64 位)</div>
         </div>
       </div>
-      <div class="dl-actions">
-        <a class="btn btn-primary" id="dl-btn-2" href="https://github.com/junzheng837-beep/vocab-master/releases/latest">下载安装包</a>
-        <a class="btn btn-ghost" href="./app/" style="height: 40px; font-size: 13.5px">不想安装？在线使用</a>
-        <div class="dl-note">点击后浏览器直接开始下载，无需登录或跳转 GitHub</div>
+
+      <div class="download-card compact">
+        <div class="left">
+          <div class="dl-badge">Android</div>
+          <h3>手机版</h3>
+          <p>和手机网页版完全一样的界面，装到桌面随时打开。</p>
+          <div class="dl-meta">
+            <span><span class="k">版本</span> <b id="apk-version">—</b></span>
+            <span><span class="k">大小</span> <b id="apk-size">—</b></span>
+          </div>
+        </div>
+        <div class="dl-actions">
+          <a class="btn btn-primary" id="apk-btn-2" href="https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk">下载 APK</a>
+          <div class="dl-note">Android 7.0 及以上，首次安装需允许未知来源</div>
+        </div>
       </div>
+    </div>
+
+    <div class="dl-extra">
+      <a class="btn btn-ghost" href="./app/">不想安装？在线使用</a>
+      <span class="dl-note">点击后浏览器直接开始下载，无需登录或跳转 GitHub</span>
     </div>
   </div>
 </section>
@@ -520,25 +575,30 @@
   // 安装包文件名固定为 shici-setup.exe，因此可以直接用 latest/download 的永久链接，
   // 不依赖 GitHub API（未登录的 API 有每小时 60 次的限流）。
   var DIRECT = 'https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-setup.exe'
+  var APK = 'https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk'
   var API = 'https://api.github.com/repos/junzheng837-beep/vocab-master/releases/latest'
 
   var meta = document.getElementById('hero-meta')
   var versionEl = document.getElementById('dl-version')
   var sizeEl = document.getElementById('dl-size')
+  var apkVersionEl = document.getElementById('apk-version')
+  var apkSizeEl = document.getElementById('apk-size')
   var btn = document.getElementById('dl-btn')
   var btn2 = document.getElementById('dl-btn-2')
+  var apkBtn = document.getElementById('apk-btn')
+  var apkBtn2 = document.getElementById('apk-btn-2')
 
-  if (meta) meta.innerHTML = '最新版本 · Windows 10 / 11 (64 位) · 双击安装即可使用'
+  if (meta) meta.innerHTML = '最新版本 · Windows 与 Android 双端 · 也支持在线使用'
 
   // 点击直接触发下载，当前页面不跳转
-  function bindDownload(el) {
+  function bindDownload(el, url, filename) {
     if (!el) return
-    el.href = DIRECT
+    el.href = url
     el.addEventListener('click', function (e) {
       e.preventDefault()
       var a = document.createElement('a')
-      a.href = DIRECT
-      a.download = 'shici-setup.exe'
+      a.href = url
+      a.download = filename
       a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()
@@ -550,8 +610,10 @@
       setTimeout(function () { label.textContent = old }, 3500)
     })
   }
-  bindDownload(btn)
-  bindDownload(btn2)
+  bindDownload(btn, DIRECT, 'shici-setup.exe')
+  bindDownload(btn2, DIRECT, 'shici-setup.exe')
+  bindDownload(apkBtn, APK, 'shici-android.apk')
+  bindDownload(apkBtn2, APK, 'shici-android.apk')
 
   function fmtSize(bytes) {
     if (!bytes) return '—'
@@ -565,8 +627,11 @@
     .then(function (rel) {
       var assets = rel.assets || []
       var setup = assets.filter(function (a) { return /setup.*\.exe$/i.test(a.name) })[0]
+      var apk = assets.filter(function (a) { return /\.apk$/i.test(a.name) })[0]
       if (versionEl) versionEl.textContent = rel.tag_name
       if (sizeEl) sizeEl.textContent = setup ? fmtSize(setup.size) : '—'
+      if (apkVersionEl) apkVersionEl.textContent = apk ? rel.tag_name : '构建中'
+      if (apkSizeEl) apkSizeEl.textContent = apk ? fmtSize(apk.size) : '—'
       if (meta) {
         meta.innerHTML = '最新版本 <b>' + rel.tag_name + '</b> · ' +
           (setup ? fmtSize(setup.size) + ' · ' : '') +
@@ -576,6 +641,8 @@
     .catch(function () {
       if (versionEl) versionEl.textContent = '最新版'
       if (sizeEl) sizeEl.textContent = '约 124 MB'
+      if (apkVersionEl) apkVersionEl.textContent = '最新版'
+      if (apkSizeEl) apkSizeEl.textContent = '约 40 MB'
     })
 })()
 </script>

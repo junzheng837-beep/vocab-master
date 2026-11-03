@@ -1,7 +1,7 @@
 {
   "name": "shici",
   "private": true,
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "拾词易记 — 拾起每一个词，记得更久",
   "author": "junzheng837-beep",
   "type": "module",
@@ -15,14 +15,21 @@
     "electron:dev": "npm run build:app && electron .",
     "electron:start": "electron .",
     "dist": "npm run build && electron-builder --win",
-    "dist:dir": "npm run build && electron-builder --win --dir"
+    "dist:dir": "npm run build && electron-builder --win --dir",
+    "android:assets": "capacitor-assets generate --android --assetPath resources",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:apk": "node scripts/build-android.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/cli": "^6.2.3",
+    "@capacitor/core": "^6.2.3",
     "electron-updater": "^6.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
@@ -47,7 +54,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
