@@ -2,6 +2,7 @@ import { store, useAppState } from '../core/store'
 import { isWeChatBrowser, speechSupported, speak } from '../core/speech'
 import type { PageId } from '../components/Sidebar'
 import AboutCard from '../components/AboutCard'
+import UpdateChecker from '../components/UpdateChecker'
 
 function Stepper({
   value,
@@ -243,6 +244,9 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
           </button>
         </div>
       </div>
+
+      <div className="section-label">版本</div>
+      <UpdateChecker />
 
       <div className="section-label">关于</div>
       <AboutCard />

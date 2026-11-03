@@ -27,3 +27,6 @@ export const REPO_URL = `https://github.com/${BRAND.repo}`
 export const RELEASES_URL = `${REPO_URL}/releases`
 export const LATEST_RELEASE_URL = `${REPO_URL}/releases/latest`
 export const LATEST_API = `https://api.github.com/repos/${BRAND.repo}/releases/latest`
+/** 安装包直链：文件名固定，所以可以用 latest/download 的永久地址 */
+export const SETUP_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/shici-setup.exe`
+export const APK_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/shici-android.apk`

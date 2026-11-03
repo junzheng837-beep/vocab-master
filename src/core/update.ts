@@ -1,4 +1,6 @@
-import { LATEST_API, LATEST_RELEASE_URL } from './brand'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
+import { APK_DOWNLOAD_URL, LATEST_API, LATEST_RELEASE_URL, SETUP_DOWNLOAD_URL } from './brand'
 import { logger } from './logger'
 
 export interface UpdateInfo {
@@ -10,6 +12,8 @@ export interface UpdateInfo {
   publishedAt: string | null
   /** 桌面端可以直接下载安装 */
   desktopAutoUpdate: boolean
+  /** 点「下载」时该打开的地址：安卓给 APK 直链，桌面给 exe 直链，网页给发布页 */
+  downloadUrl: string
 }
 
 const CACHE_KEY = 'update-check-cache'
@@ -103,6 +107,33 @@ export async function fetchLatestRelease(force = false): Promise<LatestRelease |
   }
 }
 
+/** 当前平台该下哪个包 */
+export function downloadUrlForPlatform(): string {
+  if (typeof window === 'undefined') return LATEST_RELEASE_URL
+  if (window.shici?.isDesktop) return SETUP_DOWNLOAD_URL
+  if (Capacitor.isNativePlatform()) return APK_DOWNLOAD_URL
+  return LATEST_RELEASE_URL
+}
+
+/**
+ * 打开下载地址。
+ * 安卓 App 里 window.open 会被 WebView 吞掉，必须交给系统浏览器；
+ * 而且给的是 APK 直链，浏览器会直接开始下载，不会跳到 GitHub 页面。
+ */
+export async function openDownload(url?: string) {
+  const target = url || downloadUrlForPlatform()
+  logger.info('update', '打开下载地址', { url: target })
+  if (window.shici?.isDesktop) {
+    await window.shici.openExternal(target)
+    return
+  }
+  if (Capacitor.isNativePlatform()) {
+    await Browser.open({ url: target })
+    return
+  }
+  window.open(target, '_blank', 'noopener')
+}
+
 export async function checkUpdate(force = false): Promise<UpdateInfo | null> {
   const current = currentVersion()
   const release = await fetchLatestRelease(force)
@@ -120,5 +151,6 @@ export async function checkUpdate(force = false): Promise<UpdateInfo | null> {
     notes: release.body,
     publishedAt: release.publishedAt,
     desktopAutoUpdate: !!window.shici?.isDesktop,
+    downloadUrl: downloadUrlForPlatform(),
   }
 }

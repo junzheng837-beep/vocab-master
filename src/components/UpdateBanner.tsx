@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Browser } from '@capacitor/browser'
-import { checkUpdate, type UpdateInfo } from '../core/update'
-import { LATEST_RELEASE_URL } from '../core/brand'
+import { checkUpdate, openDownload, type UpdateInfo } from '../core/update'
 
 const DISMISS_KEY = 'update-dismissed'
 
@@ -13,39 +11,37 @@ export default function UpdateBanner() {
 
   useEffect(() => {
     let alive = true
-    checkUpdate()
-      .then((r) => {
-        if (!alive || !r) return
-        setInfo(r)
-        if (r.hasUpdate && localStorage.getItem(DISMISS_KEY) === r.latest) {
-          setDismissed(true)
-        }
-      })
-      .catch(() => {})
+    const apply = (r: UpdateInfo | null) => {
+      if (!alive || !r) return
+      setInfo(r)
+      if (r.hasUpdate && localStorage.getItem(DISMISS_KEY) === r.latest) {
+        setDismissed(true)
+      }
+    }
+
+    checkUpdate().then(apply).catch(() => {})
+
+    // 手机上 App 常常挂在后台好几天，切回前台时再查一次
+    // （fetchLatestRelease 自带 30 分钟缓存，不会每次都打接口）
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      checkUpdate().then(apply).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       alive = false
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
   if (!info?.hasUpdate || dismissed) return null
 
-  const openDownload = () => {
-    const url = info.url || LATEST_RELEASE_URL
-    if (window.shici?.isDesktop) {
-      void window.shici.openExternal(url)
-      return
-    }
-    // 安卓 App 里 window.open 会被 WebView 吞掉，得交给系统浏览器
-    if (Capacitor.isNativePlatform()) {
-      void Browser.open({ url })
-      return
-    }
-    window.open(url, '_blank', 'noopener')
-  }
+  const download = () => void openDownload(info.downloadUrl)
 
   const desktopUpdate = async () => {
     if (!window.shici?.isDesktop) {
-      openDownload()
+      download()
       return
     }
     setBusy(true)
@@ -65,7 +61,13 @@ export default function UpdateBanner() {
       </span>
       <div style={{ flex: 1 }} />
       <button className="btn" style={{ height: 26 }} disabled={busy} onClick={() => void desktopUpdate()}>
-        {busy ? '准备中…' : info.desktopAutoUpdate ? '立即更新' : '去下载'}
+        {busy
+          ? '准备中…'
+          : info.desktopAutoUpdate
+            ? '立即更新'
+            : Capacitor.isNativePlatform()
+              ? '下载 APK'
+              : '去下载'}
       </button>
       <button
         className="icon-btn"
