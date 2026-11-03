@@ -8,6 +8,12 @@ function fmtDate(ts: number) {
   return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`
 }
 
+function fmtTime(ts: number) {
+  const d = new Date(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 export default function AccountPage() {
   const state = useAppState()
   const { user, customBooks, states } = state
@@ -90,14 +96,47 @@ export default function AccountPage() {
           </div>
         </div>
 
+        <div className="section-label">云同步</div>
+        <div className="card">
+          {state.cloud.enabled ? (
+            <>
+              <div className="row" style={{ justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="card-title">已开启 · 换设备登录即可接续</div>
+                  <div className="card-desc">
+                    {state.cloud.lastSyncAt
+                      ? `上次同步：${fmtTime(state.cloud.lastSyncAt)}`
+                      : '等待首次同步'}
+                    {state.cloud.pending > 0 ? ` · ${state.cloud.pending} 项待上传` : ''}
+                  </div>
+                </div>
+                <button className="btn" onClick={() => void store.syncNow()}>
+                  立即同步
+                </button>
+              </div>
+              {state.cloud.error && (
+                <div className="form-msg error" style={{ marginTop: 12 }}>
+                  {state.cloud.error}（数据已保存在本机，联网后会自动重试）
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="card-desc" style={{ lineHeight: 1.85 }}>
+              当前版本还没有接入云端，数据只保存在这台设备上。
+              换设备、重装系统前请先导出备份。
+            </div>
+          )}
+        </div>
+
         <div className="section-label">关于数据</div>
         <div className="card">
           <div className="card-desc" style={{ lineHeight: 1.85 }}>
             你的词库和学习记录按账号隔离存放，切换账号不会互相影响。
             <br />
             <br />
-            当前版本的数据保存在这台设备上。换设备、重装系统前请先导出备份，
-            或者在多台设备上使用同一个账号登录（跨设备同步正在接入中）。
+            {state.cloud.enabled
+              ? '数据先写入本机，再自动同步到云端。断网也能照常背单词，联网后会自动补传，不会因为网络问题卡住。'
+              : '当前版本的数据只保存在这台设备上。换设备、重装系统前请先导出备份。'}
           </div>
         </div>
 
@@ -129,6 +168,16 @@ export default function AccountPage() {
     )
   }
 
+  const cloudOn = state.cloud.enabled
+  const subtitle =
+    mode === 'login'
+      ? cloudOn
+        ? '登录后会自动拉取云端的词库和学习记录'
+        : '登录后你的词库和学习记录会归属这个账号'
+      : cloudOn
+        ? '同一个账号可以在多台设备登录，数据自动同步'
+        : '账号仅在本软件内有效，不会关联其他平台'
+
   return (
     <div className="page" style={{ maxWidth: 460, paddingTop: 40 }}>
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -138,9 +187,7 @@ export default function AccountPage() {
         <div className="page-title" style={{ fontSize: 23 }}>
           {mode === 'login' ? `登录${BRAND.short}` : `注册${BRAND.short}账号`}
         </div>
-        <div className="page-subtitle">
-          {mode === 'login' ? '登录后你的词库和学习记录会归属这个账号' : '账号仅在本软件内有效，不会关联其他平台'}
-        </div>
+        <div className="page-subtitle">{subtitle}</div>
       </div>
 
       <div className="segmented" style={{ display: 'flex', marginBottom: 18 }}>

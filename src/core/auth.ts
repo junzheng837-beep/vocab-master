@@ -32,6 +32,8 @@ export interface AuthProvider {
   register(username: string, password: string): Promise<AuthUser>
   login(username: string, password: string): Promise<AuthUser>
   logout(): Promise<void>
+  /** 修改密码；不支持该能力的提供方可以不实现 */
+  changePassword?(userId: string, oldPassword: string, newPassword: string): Promise<void>
 }
 
 export const AUTH_KEYS = {

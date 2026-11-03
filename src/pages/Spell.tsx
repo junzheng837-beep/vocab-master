@@ -7,7 +7,9 @@ import { logger } from '../core/logger'
 import type { RawWord, SpellLibWord, SpellLibrary } from '../core/types'
 import { IconBooks, IconSpeaker, IconSparkle, IconTrash } from '../components/Icons'
 
-const HINT_LABELS = ['提示前缀', '提示后缀', '直接看答案']
+const HINT_LABELS = ['提示读音', '提示骨架', '提示前半段', '直接看答案']
+/** 提示一共 4 级：读音 → 骨架 → 前半段 → 完整答案 */
+const MAX_HINT = 4
 
 interface Affix {
   /** 展示用，如「pre-（在前）」 */
@@ -64,7 +66,14 @@ function shortMeaning(meaning: string): string {
   return label ? `（${label}）` : ''
 }
 
-/** 按提示等级遮罩单词：1 露前缀，2 露前缀+后缀，3 全露 */
+/**
+ * 按提示等级遮罩单词。
+ *
+ * 1 级只给读音，不动字母；
+ * 2 级给「骨架」——有词缀就露出前后缀，没有就露首尾字母；
+ * 3 级露出前半段（至少比上一级多，且始终留 3 个空）；
+ * 4 级全露。
+ */
 function maskWord(
   word: string,
   level: number,
@@ -75,21 +84,27 @@ function maskWord(
   const letters = chars.map((c, i) => ({ c, i })).filter((x) => /[a-zA-Z]/.test(x.c))
   const visible = new Set<number>()
 
-  if (level >= 3) {
+  const revealFirst = (n: number) => {
+    letters.slice(0, Math.max(0, n)).forEach((x) => visible.add(x.i))
+  }
+
+  if (level >= 4) {
     letters.forEach((x) => visible.add(x.i))
+  } else if (level === 3) {
+    const half = Math.ceil(letters.length / 2)
+    // 上一级如果已经靠词缀露了不少字母，这一级至少再多给两个，否则看不出进展
+    const fromAffix = prefixLen + suffixLen
+    const maxReveal = Math.max(1, letters.length - 3)
+    revealFirst(Math.min(maxReveal, Math.max(half, fromAffix + 2)))
   } else if (level === 2) {
     if (prefixLen > 0 || suffixLen > 0) {
-      letters.slice(0, prefixLen).forEach((x) => visible.add(x.i))
-      letters.slice(Math.max(prefixLen, letters.length - suffixLen)).forEach((x) => visible.add(x.i))
+      revealFirst(prefixLen)
+      letters
+        .slice(Math.max(prefixLen, letters.length - suffixLen))
+        .forEach((x) => visible.add(x.i))
     } else {
       if (letters[0]) visible.add(letters[0].i)
       if (letters.length > 1) visible.add(letters[letters.length - 1].i)
-    }
-  } else if (level === 1) {
-    if (prefixLen > 0) {
-      letters.slice(0, prefixLen).forEach((x) => visible.add(x.i))
-    } else if (letters[0]) {
-      visible.add(letters[0].i)
     }
   }
 
@@ -224,7 +239,7 @@ export default function SpellPage() {
       word
         ? maskWord(
             word.w,
-            result === 'correct' ? 3 : hint,
+            result === 'correct' ? MAX_HINT : hint,
             affix.pre?.part.length ?? 0,
             affix.suf?.part.length ?? 0
           )
@@ -232,22 +247,44 @@ export default function SpellPage() {
     [word, hint, result, affix]
   )
 
+  /** 当前已露出的字母数，第 3 级提示文案要用 */
+  const revealed = useMemo(
+    () => masked.filter((c) => c !== '_' && /[a-zA-Z]/.test(c)).length,
+    [masked]
+  )
+
+  const phonetic = word?.us || word?.uk || ''
+
   const hintText = useMemo(() => {
     if (!word || hint === 0) return ''
     const first = [...word.w].find((c) => /[a-zA-Z]/.test(c))?.toUpperCase() ?? ''
+    const last =
+      [...word.w].reverse().find((c) => /[a-zA-Z]/.test(c))?.toUpperCase() ?? ''
     const letters = word.w.replace(/[^a-zA-Z]/g, '').length
+
     if (hint === 1) {
-      return affix.pre
-        ? `词根前缀是 ${affix.pre.label}，已给出这 ${affix.pre.part.length} 个字母`
-        : `这个词没有可拆的前缀，以 ${first} 开头，共 ${letters} 个字母`
+      // 只给读音，不给字母——拼写卡住的本质就是「音」到「形」的映射
+      return phonetic
+        ? `读音 /${phonetic}/，共 ${letters} 个字母。按读音一个音节一个音节地拼`
+        : `这个词没有音标。共 ${letters} 个字母，以 ${first} 开头、${last} 结尾`
     }
+
     if (hint === 2) {
-      return affix.suf
-        ? `后缀是 ${affix.suf.label}，已给出词尾这 ${affix.suf.part.length} 个字母`
-        : `没有可拆的后缀，已给出首尾字母，共 ${letters} 个字母`
+      if (affix.pre || affix.suf) {
+        const parts = [
+          affix.pre ? `前缀 ${affix.pre.label}` : '',
+          affix.suf ? `后缀 ${affix.suf.label}` : '',
+        ].filter(Boolean)
+        return `由${parts.join('和')}组成，已给出这 ${revealed} 个字母`
+      }
+      return `以 ${first} 开头、${last} 结尾，共 ${letters} 个字母`
+    }
+
+    if (hint === 3) {
+      return `已给出前 ${revealed} 个字母，剩下的顺着读音补完`
     }
     return '完整单词已给出，跟着打一遍加深印象'
-  }, [word, hint, affix])
+  }, [word, hint, affix, revealed, phonetic])
 
   function check() {
     if (!word) return
@@ -284,7 +321,7 @@ export default function SpellPage() {
         <div className="page-header">
           <div className="page-title">拼写练习</div>
           <div className="page-subtitle">
-            根据中文释义把单词完整拼出来 · 提示会先给词根前缀，再给后缀，最后才给答案
+            根据中文释义把单词完整拼出来 · 卡住了可以按提示：先给读音，再给骨架，最后给前半段
           </div>
         </div>
 
@@ -440,14 +477,27 @@ export default function SpellPage() {
           <div className="spell-hint-row">
             <button
               className="btn"
-              disabled={hint >= 3}
-              onClick={() => setHint((h) => Math.min(3, h + 1))}
+              disabled={hint >= MAX_HINT}
+              onClick={() => setHint((h) => Math.min(MAX_HINT, h + 1))}
             >
               <IconSparkle size={13} />
-              {HINT_LABELS[Math.min(hint, 2)]}
+              {HINT_LABELS[Math.min(hint, MAX_HINT - 1)]}
               {hint > 0 && `（已提示 ${hint} 次）`}
             </button>
-            {hint > 0 && <span className="spell-hint-text">{hintText}</span>}
+            {hint > 0 && (
+              <span className="spell-hint-text">
+                {hintText}
+                {hint === 1 && phonetic && (
+                  <button
+                    className="hint-speak"
+                    title="听一遍读音"
+                    onClick={() => speak(word!.w)}
+                  >
+                    <IconSpeaker size={12} />
+                  </button>
+                )}
+              </span>
+            )}
           </div>
         )}
       </div>

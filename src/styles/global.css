@@ -1956,6 +1956,25 @@ textarea.input {
 .spell-hint-text {
   font-size: 12.5px;
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+.hint-speak {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.hint-speak:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 .spell-detail {

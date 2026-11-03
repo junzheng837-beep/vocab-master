@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { createDriver, keysFor, type DataKeys, type StorageDriver } from './storage'
-import { LocalAuthProvider, type AuthUser } from './auth'
+import { LocalAuthProvider, type AuthProvider, type AuthUser } from './auth'
+import { CloudAuthProvider, SyncDriver, cloudConfigured } from './cloud'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
 import { loadBook, loadLetterWords, loadRoots } from './dict'
 import { parseScope, type LetterSource } from './scope'
@@ -33,6 +34,18 @@ export interface SessionState {
   scope: string | null
 }
 
+/** 云同步的对外状态，供界面展示 */
+export interface CloudState {
+  /** 是否配置了云服务；false 表示纯本地模式 */
+  enabled: boolean
+  /** 上次成功同步的时间戳 */
+  lastSyncAt: number | null
+  /** 等待上传的变更数 */
+  pending: number
+  /** 最近一次同步失败原因 */
+  error: string | null
+}
+
 export interface AppState {
   ready: boolean
   error: string | null
@@ -47,6 +60,7 @@ export interface AppState {
   manifest: BookMeta[]
   books: Record<string, BookData>
   session: SessionState
+  cloud: CloudState
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -75,8 +89,15 @@ const emptySession: SessionState = {
 }
 
 class AppStore {
-  private driver: StorageDriver = createDriver()
-  private auth: LocalAuthProvider = new LocalAuthProvider(this.driver)
+  /** 本地存储永远是主存储 */
+  private localDriver: StorageDriver = createDriver()
+  /** 配置了云服务时，在本地驱动外面再包一层同步 */
+  private sync: SyncDriver | null = cloudConfigured ? new SyncDriver(this.localDriver) : null
+  private driver: StorageDriver = this.sync ?? this.localDriver
+  /** 账号始终存在本地，只有数据会同步 */
+  private auth: AuthProvider = cloudConfigured
+    ? new CloudAuthProvider()
+    : new LocalAuthProvider(this.localDriver)
   /** 当前账号的数据命名空间 */
   private keys: DataKeys = keysFor(null)
   private listeners = new Set<() => void>()
@@ -92,6 +113,7 @@ class AppStore {
     manifest: [],
     books: {},
     session: emptySession,
+    cloud: { enabled: cloudConfigured, lastSyncAt: null, pending: 0, error: null },
   }
   private seq = 0
 
@@ -153,8 +175,17 @@ class AppStore {
     }
   }
 
-  /** 按当前命名空间载入账号数据 */
-  private async loadUserData(user: AuthUser | null) {
+  /** 按当前命名空间载入账号数据；skipPull 用于手动同步后避免重复拉取 */
+  private async loadUserData(user: AuthUser | null, skipPull = false) {
+    this.keys = keysFor(user?.id ?? null)
+
+    // 登录后才开启同步；游客状态下所有数据只留在本机
+    if (this.sync) {
+      this.sync.setScope(user ? this.keys.prefix : null)
+      if (user && !skipPull) await this.sync.pull()
+      this.set({ cloud: { enabled: true, ...this.sync.getStatus() } })
+    }
+
     const [settings, logs, customBooks, stateMap, spellList] = await Promise.all([
       this.driver.get<Settings>(this.keys.settings),
       this.driver.get<Record<string, DailyLog>>(this.keys.logs),
@@ -195,7 +226,6 @@ class AppStore {
     const user = await this.auth.register(username, password)
     logger.info('auth', '注册成功', { id: user.id, username: user.username })
     await this.migrateGuestData(user.id)
-    this.keys = keysFor(user.id)
     await this.loadUserData(user)
     await this.rebuildSession(null)
     return user
@@ -205,7 +235,6 @@ class AppStore {
     logger.info('auth', '尝试登录', { username })
     const user = await this.auth.login(username, password)
     logger.info('auth', '登录成功', { id: user.id, username: user.username })
-    this.keys = keysFor(user.id)
     await this.loadUserData(user)
     await this.rebuildSession(null)
     return user
@@ -214,14 +243,45 @@ class AppStore {
   async logout() {
     logger.info('auth', '退出登录', { username: this.state.user?.username })
     await this.auth.logout()
-    this.keys = keysFor(null)
     await this.loadUserData(null)
     await this.rebuildSession(null)
   }
 
   async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    if (!this.auth.changePassword) throw new Error('当前登录方式不支持修改密码')
     await this.auth.changePassword(userId, oldPassword, newPassword)
     logger.info('auth', '密码已修改', { userId })
+  }
+
+  /** 手动同步：先推本地变更，再拉云端，然后刷新内存数据（不清空当前学习会话） */
+  async syncNow() {
+    if (!this.sync) return
+    logger.info('cloud', '手动同步开始')
+    await this.sync.flush()
+    await this.sync.pull()
+
+    const [settings, logs, customBooks, stateMap, spellList] = await Promise.all([
+      this.driver.get<Settings>(this.keys.settings),
+      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+      this.driver.get<CustomBook[]>(this.keys.customBooks),
+      this.driver.entries<WordState>(this.keys.statePrefix),
+      this.driver.get<SpellItem[]>(this.keys.spellList),
+    ])
+
+    const states: Record<string, WordState> = {}
+    for (const [k, v] of Object.entries(stateMap)) {
+      states[k.slice(this.keys.statePrefix.length)] = v
+    }
+
+    this.set({
+      settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) },
+      logs: logs ?? {},
+      customBooks: customBooks ?? [],
+      spellList: spellList ?? [],
+      states,
+      cloud: { enabled: true, ...this.sync.getStatus() },
+    })
+    logger.info('cloud', '手动同步完成')
   }
 
   /**

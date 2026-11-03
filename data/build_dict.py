@@ -35,6 +35,18 @@ def clean(s):
     s = s.replace('\u3000', ' ').replace('\xa0', ' ')
     return CLEAN_RE.sub(' ', s).strip()
 
+
+def fix_phonetic(s):
+    """ECDICT / 词书里的音标写法不统一（ә / : / '，还有「ˈæktjʊəlɪ; -tʃʊ-」这种变体注记），
+    统一换成标准 IPA 符号，并去掉分号后面的变体说明"""
+    if not s:
+        return ''
+    out = s.split(';')[0].split('；')[0].strip()
+    out = out.replace('ә', 'ə').replace(':', 'ː').replace("'", 'ˈ')
+    if out.startswith(','):
+        out = 'ˌ' + out[1:]
+    return out
+
 def dedupe_key(s):
     """用于判断两条例句是否实质相同（忽略标点与大小写）"""
     return re.sub(r'[^a-z ]', '', s.lower()).strip()
@@ -292,7 +304,7 @@ def main():
             tags = (row['tag'] or '').split()
             ecdict[key] = {
                 'word': w,
-                'phonetic': clean(row['phonetic'] or ''),
+                'phonetic': fix_phonetic(clean(row['phonetic'] or '')),
                 'trans': parse_translation(row['translation'] or ''),
                 'tags': tags,
                 'frq': int(row['frq'] or 0),
@@ -313,8 +325,8 @@ def main():
                 break
         entry = {
             'w': meta['word'],
-            'uk': rec.get('uk') or meta['phonetic'],
-            'us': rec.get('us') or meta['phonetic'],
+            'uk': fix_phonetic(rec.get('uk') or meta['phonetic']),
+            'us': fix_phonetic(rec.get('us') or meta['phonetic']),
             't': meta['trans'],
             's': rec.get('s') or [],
             'p': rec.get('p') or [],
@@ -492,7 +504,7 @@ def main():
             meta = ecdict[w.lower()]
             details.append({
                 'w': meta['word'],
-                'p': meta['phonetic'],
+                'p': fix_phonetic(meta['phonetic']),
                 't': [[a, b] for a, b in meta['trans'][:3]],
             })
         root_payload.append({
@@ -552,9 +564,10 @@ def main():
                 continue
             if any(x['w'].lower() == w.lower() for x in writing_words[start:]):
                 continue
+            rec = kaj.get(w.lower(), {})
             writing_words.append({
                 'w': meta['word'],
-                'p': meta['phonetic'],
+                'p': fix_phonetic(rec.get('us') or rec.get('uk') or meta['phonetic']),
                 't': [[a, b] for a, b in meta['trans'][:3]],
                 'r': spell_roots(w.lower()),
                 'g': group_name,
@@ -575,7 +588,7 @@ def main():
         print('    作文词缺失: %s' % ', '.join(missing_writing))
 
     cet4_core_words = [
-        {'w': e['w'], 'p': e.get('uk') or e.get('us') or '', 't': e['t'][:3], 'r': e.get('r') or []}
+        {'w': e['w'], 'p': fix_phonetic(e.get('uk') or e.get('us') or ''), 't': e['t'][:3], 'r': e.get('r') or []}
         for e in book_entries.get('cet4_core', [])
     ]
     with_affix = sum(1 for w in writing_words + cet4_core_words if w['r'])
@@ -613,7 +626,7 @@ def main():
             by_letter.setdefault(first, []).append({
                 'w': e['w'],
                 'b': bid,
-                'p': e.get('uk') or e.get('us') or '',
+                'p': fix_phonetic(e.get('uk') or e.get('us') or ''),
                 't': e['t'][:3],
             })
             total_letter_words += 1
