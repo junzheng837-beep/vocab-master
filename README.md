@@ -2,11 +2,13 @@
 
 > 拾起每一个词，记得更久
 
-一款 macOS 风格的英语背单词软件。桌面端 + 网页端同一套代码，数据存在本机，支持账号隔离与自定义词库导入。
+一款 macOS 风格的英语背单词软件。网页端、Windows 桌面端、Android 手机端同一套代码，
+数据存在本机，支持账号隔离与自定义词库导入。
 
 **官网**：https://junzheng837-beep.github.io/vocab-master/
 **在线使用**：https://junzheng837-beep.github.io/vocab-master/app/
-**下载安装**：https://github.com/junzheng837-beep/vocab-master/releases/latest
+**Windows**：https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-setup.exe
+**Android**：https://github.com/junzheng837-beep/vocab-master/releases/latest/download/shici-android.apk
 
 ![背单词界面](site/assets/shot-study.png)
 
@@ -71,6 +73,21 @@ ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/" \
 ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/" \
 npm run dist
 ```
+
+## 安卓版
+
+手机端用 [Capacitor](https://capacitorjs.com) 把同一份 `dist/app` 套进原生 WebView，
+界面和手机网页版完全一致，只是多了应用图标、启动图和全屏。
+
+```bash
+npm run android:apk     # 本地打包，需要 JDK 17 + Android SDK
+```
+
+- 包名 `com.shici.vocab`，minSdk 22（Android 5.0+），compileSdk 34，锁定竖屏
+- 图标和启动图放在 `resources/`，改完执行 `npm run android:assets` 重新生成
+- 签名用仓库里的自签名证书（`android/keystore/`），提交它是为了让每次构建签名一致，
+  用户才能覆盖安装升级；这是个人项目的自签名证书，不是需要保密的凭据
+- 发版时 CI 会自动构建并上传 `shici-android.apk`，文件名固定，官网用永久链接
 
 ## 发布流程
 
