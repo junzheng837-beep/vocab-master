@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 import { checkUpdate, type UpdateInfo } from '../core/update'
 import { LATEST_RELEASE_URL } from '../core/brand'
 
@@ -29,8 +31,16 @@ export default function UpdateBanner() {
 
   const openDownload = () => {
     const url = info.url || LATEST_RELEASE_URL
-    if (window.shici?.isDesktop) void window.shici.openExternal(url)
-    else window.open(url, '_blank', 'noopener')
+    if (window.shici?.isDesktop) {
+      void window.shici.openExternal(url)
+      return
+    }
+    // 安卓 App 里 window.open 会被 WebView 吞掉，得交给系统浏览器
+    if (Capacitor.isNativePlatform()) {
+      void Browser.open({ url })
+      return
+    }
+    window.open(url, '_blank', 'noopener')
   }
 
   const desktopUpdate = async () => {

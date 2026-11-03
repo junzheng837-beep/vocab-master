@@ -1,7 +1,7 @@
 {
   "name": "shici",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "拾词易记 — 拾起每一个词，记得更久",
   "author": "junzheng837-beep",
   "type": "module",
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^6.2.3",
+    "@capacitor/browser": "^6.0.6",
     "@capacitor/cli": "^6.2.3",
     "@capacitor/core": "^6.2.3",
     "electron-updater": "^6.6.2",
