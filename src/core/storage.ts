@@ -167,6 +167,8 @@ export function makeKeys(prefix: string) {
     logs: `${prefix}cfg:logs`,
     customBooks: `${prefix}cfg:customBooks`,
     spellList: `${prefix}cfg:spellList`,
+    /** 内置词库里用户自己加的单词：{ [bookId]: RawWord[] } */
+    bookExtras: `${prefix}cfg:bookExtras`,
     statePrefix: `${prefix}state:`,
     state: (key: string) => `${prefix}state:${key}`,
   }

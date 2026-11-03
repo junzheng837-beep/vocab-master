@@ -57,6 +57,8 @@ export interface AppState {
   customBooks: CustomBook[]
   /** 拼写练习列表 */
   spellList: SpellItem[]
+  /** 内置词库里用户追加的单词 */
+  bookExtras: Record<string, RawWord[]>
   manifest: BookMeta[]
   books: Record<string, BookData>
   session: SessionState
@@ -110,6 +112,7 @@ class AppStore {
     logs: {},
     customBooks: [],
     spellList: [],
+    bookExtras: {},
     manifest: [],
     books: {},
     session: emptySession,
@@ -186,12 +189,13 @@ class AppStore {
       this.set({ cloud: { enabled: true, ...this.sync.getStatus() } })
     }
 
-    const [settings, logs, customBooks, stateMap, spellList] = await Promise.all([
+    const [settings, logs, customBooks, stateMap, spellList, bookExtras] = await Promise.all([
       this.driver.get<Settings>(this.keys.settings),
       this.driver.get<Record<string, DailyLog>>(this.keys.logs),
       this.driver.get<CustomBook[]>(this.keys.customBooks),
       this.driver.entries<WordState>(this.keys.statePrefix),
       this.driver.get<SpellItem[]>(this.keys.spellList),
+      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
     ])
 
     const states: Record<string, WordState> = {}
@@ -214,9 +218,11 @@ class AppStore {
       logs: logs ?? {},
       customBooks: customBooks ?? [],
       spellList: spellList ?? [],
+      bookExtras: bookExtras ?? {},
       states,
       session: { ...emptySession },
     })
+    this.mergedBooks.clear()
   }
 
   /* ------------------------------------------------------------ 账号 */
@@ -260,12 +266,13 @@ class AppStore {
     await this.sync.flush()
     await this.sync.pull()
 
-    const [settings, logs, customBooks, stateMap, spellList] = await Promise.all([
+    const [settings, logs, customBooks, stateMap, spellList, bookExtras] = await Promise.all([
       this.driver.get<Settings>(this.keys.settings),
       this.driver.get<Record<string, DailyLog>>(this.keys.logs),
       this.driver.get<CustomBook[]>(this.keys.customBooks),
       this.driver.entries<WordState>(this.keys.statePrefix),
       this.driver.get<SpellItem[]>(this.keys.spellList),
+      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
     ])
 
     const states: Record<string, WordState> = {}
@@ -278,9 +285,11 @@ class AppStore {
       logs: logs ?? {},
       customBooks: customBooks ?? [],
       spellList: spellList ?? [],
+      bookExtras: bookExtras ?? {},
       states,
       cloud: { enabled: true, ...this.sync.getStatus() },
     })
+    this.mergedBooks.clear()
     logger.info('cloud', '手动同步完成')
   }
 
@@ -290,10 +299,25 @@ class AppStore {
    */
   private async migrateGuestData(userId: string) {
     const guestKeys = keysFor(null)
+    const userKeys = keysFor(userId)
+
+    // 内置词书里追加的词也要跟着走
+    const guestExtras = await this.driver.get<Record<string, RawWord[]>>(guestKeys.bookExtras)
+    if (guestExtras && Object.keys(guestExtras).length) {
+      const existingExtras =
+        (await this.driver.get<Record<string, RawWord[]>>(userKeys.bookExtras)) ?? {}
+      const mergedExtras: Record<string, RawWord[]> = { ...existingExtras }
+      for (const [bookId, words] of Object.entries(guestExtras)) {
+        const cur = mergedExtras[bookId] ?? []
+        const seen = new Set(cur.map((w) => w.w.toLowerCase()))
+        mergedExtras[bookId] = [...cur, ...words.filter((w) => !seen.has(w.w.toLowerCase()))]
+      }
+      await this.driver.set(userKeys.bookExtras, mergedExtras)
+    }
+
     const guestBooks = await this.driver.get<CustomBook[]>(guestKeys.customBooks)
     if (!guestBooks?.length) return
 
-    const userKeys = keysFor(userId)
     const existing = (await this.driver.get<CustomBook[]>(userKeys.customBooks)) ?? []
     const merged = [...existing]
     for (const b of guestBooks) {
@@ -358,11 +382,32 @@ class AppStore {
     }
   }
 
+  /** 合并后的词书缓存，键是 bookId，长度对不上就重建 */
+  private mergedBooks = new Map<string, BookData>()
+
   private bookData(id: string): BookData | undefined {
-    if (this.state.books[id]) return this.state.books[id]
-    const cb = this.state.customBooks.find((b) => b.id === id)
-    if (cb) return this.customAsBook(cb)
-    return undefined
+    const base =
+      this.state.books[id] ??
+      (() => {
+        const cb = this.state.customBooks.find((b) => b.id === id)
+        return cb ? this.customAsBook(cb) : undefined
+      })()
+    if (!base) return undefined
+
+    const extras = this.state.bookExtras[id]
+    if (!extras?.length) return base
+
+    const cached = this.mergedBooks.get(id)
+    if (cached && cached.words.length === base.words.length + extras.length) return cached
+
+    // 追加的词排在前面：内置词书按词频排序，几千个词排在队尾等于永远轮不到
+    const merged: BookData = {
+      ...base,
+      wordCount: base.words.length + extras.length,
+      words: [...extras, ...base.words],
+    }
+    this.mergedBooks.set(id, merged)
+    return merged
   }
 
   /* ------------------------------------------------------------ 会话 */
@@ -870,6 +915,103 @@ class AppStore {
       带例句: words.filter((w) => w.s.length > 0).length,
     })
     return book
+  }
+
+  /**
+   * 往已有的自建词书追加单词。
+   * 已经在书里的词直接跳过，不会产生重复条目。
+   */
+  async appendToCustomBook(
+    id: string,
+    words: RawWord[]
+  ): Promise<{ added: number; skipped: number; book: CustomBook | null }> {
+    const target = this.state.customBooks.find((b) => b.id === id)
+    if (!target) {
+      logger.warn('import', '追加失败：词书不存在', { id })
+      return { added: 0, skipped: 0, book: null }
+    }
+
+    const existing = new Set(target.words.map((w) => w.w.toLowerCase()))
+    const fresh: RawWord[] = []
+    for (const w of words) {
+      const key = w.w.trim().toLowerCase()
+      if (!key || existing.has(key)) continue
+      existing.add(key)
+      fresh.push(w)
+    }
+
+    const skipped = words.length - fresh.length
+    if (!fresh.length) {
+      logger.info('import', '追加跳过：全部已存在', { id, 名称: target.name, 重复: skipped })
+      return { added: 0, skipped, book: target }
+    }
+
+    const updated: CustomBook = {
+      ...target,
+      words: [...target.words, ...fresh],
+      updatedAt: Date.now(),
+    }
+    const customBooks = this.state.customBooks.map((b) => (b.id === id ? updated : b))
+    this.set({ customBooks })
+    await this.driver.set(this.keys.customBooks, customBooks)
+    logger.info('import', '已追加到自建词书', {
+      名称: updated.name,
+      id,
+      新增: fresh.length,
+      跳过重复: skipped,
+      现有: updated.words.length,
+    })
+    return { added: fresh.length, skipped, book: updated }
+  }
+
+  /**
+   * 往任意词书追加单词。
+   * 自建词书直接写进 words；内置词书存到 bookExtras，读取时和原始词表合并。
+   */
+  async addWordsToBook(
+    bookId: string,
+    words: RawWord[]
+  ): Promise<{ added: number; skipped: number; bookName: string }> {
+    const isCustom = this.state.customBooks.some((b) => b.id === bookId)
+    if (isCustom) {
+      const r = await this.appendToCustomBook(bookId, words)
+      return { added: r.added, skipped: r.skipped, bookName: r.book?.name ?? '' }
+    }
+
+    await this.ensureBooks([bookId])
+    const book = this.bookData(bookId)
+    if (!book) {
+      logger.warn('import', '追加失败：词书不存在', { bookId })
+      return { added: 0, skipped: 0, bookName: '' }
+    }
+
+    const existing = new Set(book.words.map((w) => w.w.toLowerCase()))
+    const fresh: RawWord[] = []
+    for (const w of words) {
+      const key = w.w.trim().toLowerCase()
+      if (!key || existing.has(key)) continue
+      existing.add(key)
+      fresh.push(w)
+    }
+    const skipped = words.length - fresh.length
+    if (!fresh.length) {
+      logger.info('import', '追加跳过：全部已存在', { 名称: book.name, 重复: skipped })
+      return { added: 0, skipped, bookName: book.name }
+    }
+
+    const prev = this.state.bookExtras[bookId] ?? []
+    const bookExtras = { ...this.state.bookExtras, [bookId]: [...prev, ...fresh] }
+    this.mergedBooks.delete(bookId)
+    this.set({ bookExtras })
+    await this.driver.set(this.keys.bookExtras, bookExtras)
+    logger.info('import', '已追加到内置词书', {
+      名称: book.name,
+      bookId,
+      新增: fresh.length,
+      跳过重复: skipped,
+      现有: book.words.length + fresh.length,
+    })
+    return { added: fresh.length, skipped, bookName: book.name }
   }
 
   async removeCustomBook(id: string) {

@@ -31,7 +31,11 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
   }
 
   const allBooks = [
-    ...manifest.map((m) => ({ ...m, custom: false })),
+    ...manifest.map((m) => ({
+      ...m,
+      count: m.count + (state.bookExtras[m.id]?.length ?? 0),
+      custom: false,
+    })),
     ...customBooks.map((b) => ({
       id: b.id,
       name: b.name,
@@ -103,6 +107,15 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                         <span>
                           {learned} / {b.count} 词
                         </span>
+                        <button
+                          className="preview-link"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.location.hash = `/import/${b.id}`
+                          }}
+                        >
+                          ＋ 添加单词
+                        </button>
                         <button
                           className="preview-link"
                           onClick={(e) => {
@@ -193,6 +206,15 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                       className="preview-link"
                       onClick={(e) => {
                         e.stopPropagation()
+                        window.location.hash = `/import/${b.id}`
+                      }}
+                    >
+                      ＋ 添加单词
+                    </button>
+                    <button
+                      className="preview-link"
+                      onClick={(e) => {
+                        e.stopPropagation()
                         setPreview({ id: b.id, name: b.name, custom: true })
                       }}
                     >
@@ -221,6 +243,7 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           bookId={preview.id}
           name={preview.name}
           custom={preview.custom}
+          extraWords={state.bookExtras[preview.id]}
           onClose={() => setPreview(null)}
         />
       )}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { store } from '../core/store'
+import { store, useAppState } from '../core/store'
 import { lookupWords } from '../core/dict'
 import { logger } from '../core/logger'
 import type { PageId } from '../components/Sidebar'
@@ -58,14 +58,46 @@ function parseLines(text: string): ParsedItem[] {
   return out
 }
 
-export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => void }) {
+interface Props {
+  onNavigate: (p: PageId) => void
+  /** 从词库卡片点「添加单词」进来时，预选这本词书 */
+  presetBookId?: string
+}
+
+export default function ImportPage({ onNavigate, presetBookId }: Props) {
+  const state = useAppState()
+  const customBooks = state.customBooks
+
   const [name, setName] = useState('')
   const [text, setText] = useState('')
   const [items, setItems] = useState<ParsedItem[]>([])
   const [hits, setHits] = useState<Map<string, RawWord>>(new Map())
   const [manual, setManual] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState<string | null>(null)
+  const [saved, setSaved] = useState<{ text: string; bookId: string } | null>(null)
+
+  // 可以追加的目标：所有内置词书 + 自建词书
+  const allBooks = useMemo(() => {
+    const builtin = state.manifest.map((m) => ({
+      id: m.id,
+      name: m.name,
+      count: m.count + (state.bookExtras[m.id]?.length ?? 0),
+      custom: false,
+    }))
+    const mine = customBooks.map((b) => ({
+      id: b.id,
+      name: b.name,
+      count: b.words.length,
+      custom: true,
+    }))
+    return [...mine, ...builtin]
+  }, [state.manifest, state.bookExtras, customBooks])
+
+  // 选中的目标词书；空字符串表示新建
+  const [targetId, setTargetId] = useState(() =>
+    allBooks.some((b) => b.id === presetBookId) ? (presetBookId as string) : ''
+  )
+  const targetBook = allBooks.find((b) => b.id === targetId)
 
   const missList = useMemo(
     () => items.filter((it) => !hits.has(it.word)),
@@ -115,7 +147,6 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
   }
 
   async function save() {
-    const bookName = name.trim() || '我的词书'
     const words: RawWord[] = items.map((it) => {
       const hit = hits.get(it.word)
       const base: RawWord = hit ?? {
@@ -133,18 +164,36 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
       if (it.group) out.g = it.group
       return out
     })
-    logger.info('import', '保存自建词书', {
-      名称: bookName,
-      词数: words.length,
-      分组: [...new Set(words.map((w) => w.g).filter(Boolean))],
-      无释义: words.filter((w) => w.t.length === 0).length,
-    })
-    const book = await store.addCustomBook(
-      bookName,
-      `${words.length} 个自定义单词`,
-      words
-    )
-    setSaved(book.name)
+
+    if (targetBook) {
+      logger.info('import', '追加单词到已有词书', {
+        名称: targetBook.name,
+        词数: words.length,
+      })
+      const r = await store.addWordsToBook(targetBook.id, words)
+      if (!r.bookName) {
+        alert('这本词书已经不在了，请重新选择')
+        setTargetId('')
+        return
+      }
+      setSaved({
+        text: r.added
+          ? `已把 ${r.added} 个单词加到「${r.bookName}」${r.skipped ? `，${r.skipped} 个重复的已跳过` : ''}`
+          : `这些词都已经在「${r.bookName}」里了`,
+        bookId: targetBook.id,
+      })
+    } else {
+      const bookName = name.trim() || '我的词书'
+      logger.info('import', '保存自建词书', {
+        名称: bookName,
+        词数: words.length,
+        分组: [...new Set(words.map((w) => w.g).filter(Boolean))],
+        无释义: words.filter((w) => w.t.length === 0).length,
+      })
+      const book = await store.addCustomBook(bookName, `${words.length} 个自定义单词`, words)
+      setSaved({ text: `「${book.name}」已保存，共 ${words.length} 个单词`, bookId: book.id })
+    }
+
     setName('')
     setText('')
     setItems([])
@@ -159,7 +208,7 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
       <div className="page-header">
         <div className="page-title">导入词库</div>
         <div className="page-subtitle">
-          粘贴你遇到的单词，内置词库有的会自动补上音标、释义和例句，你只需要给没收录的补一下
+          粘贴你遇到的单词，内置词库有的会自动补上音标、释义和例句；可以新建词库，也可以直接追加到已有的词库
         </div>
       </div>
 
@@ -176,9 +225,7 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
             <span style={{ color: 'var(--green)', display: 'flex' }}>
               <IconCheck size={15} />
             </span>
-            <span style={{ fontSize: 13 }}>
-              「{saved}」已保存。去「词库」里勾选它就能开始背了。
-            </span>
+            <span style={{ fontSize: 13 }}>{saved.text}</span>
             <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => onNavigate('library')}>
               去看词库
             </button>
@@ -187,14 +234,45 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
       )}
 
       <div className="field" style={{ marginBottom: 16 }}>
-        <label className="field-label">词书名称</label>
-        <input
-          className="input"
-          placeholder="例如：我的生词本、雅思核心、专业术语"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <label className="field-label">保存到</label>
+        <select
+          className="input select"
+          value={targetId}
+          onChange={(e) => {
+            setTargetId(e.target.value)
+            setSaved(null)
+          }}
+        >
+          <option value="">＋ 新建一本词库</option>
+          {allBooks.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.custom ? '自建 · ' : ''}
+              {b.name}（{b.count} 词）
+            </option>
+          ))}
+        </select>
+        {targetBook ? (
+          <div className="card-desc" style={{ marginTop: 7, lineHeight: 1.6 }}>
+            新词会加到「{targetBook.name}」，和原来的词一起背；书里已经有的词自动跳过，不会重复。
+          </div>
+        ) : (
+          <div className="card-desc" style={{ marginTop: 7, lineHeight: 1.6 }}>
+            想往已有的词库里加词？在上面选中它就行，不用再建一本新的。
+          </div>
+        )}
       </div>
+
+      {!targetBook && (
+        <div className="field" style={{ marginBottom: 16 }}>
+          <label className="field-label">新词库名称</label>
+          <input
+            className="input"
+            placeholder="例如：我的生词本、雅思核心、专业术语"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+      )}
 
       <div className="field" style={{ marginBottom: 12 }}>
         <label className="field-label">
@@ -281,11 +359,12 @@ export default function ImportPage({ onNavigate }: { onNavigate: (p: PageId) => 
       <div className="section-label">怎么用</div>
       <div className="card">
         <div className="card-desc" style={{ lineHeight: 1.8 }}>
-          1. 给词书起个名字，比如「阅读生词」<br />
+          1. 选「保存到」：新建一本词库，或者直接选中已有的词库往里加<br />
           2. 把单词粘进上面的框，一行一个<br />
-          3. 点「识别单词」，初中 / 高中 / 四级 / 六级 / 考研 / 日常词库里有的词会自动带出音标、释义和例句<br />
+          3. 点「识别单词」，内置词库里有的词会自动带出音标、释义和例句<br />
           4. 没收录的词在右边填一下中文意思，然后保存<br />
-          5. 保存后回到「词库」勾选它，就会加入每日学习队列
+          5. 追加到已有词库时，书里已经有的词会自动跳过，不会重复<br />
+          6. 保存后回到「词库」勾选它，就会加入每日学习队列
         </div>
       </div>
     </div>

@@ -192,7 +192,12 @@ export default function App() {
           {page === 'library' && <LibraryPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'stats' && <StatsPage />}
           {page === 'settings' && <SettingsPage onNavigate={(p) => navigate(`/${p}`)} />}
-          {page === 'import' && <ImportPage onNavigate={(p) => navigate(`/${p}`)} />}
+          {page === 'import' && (
+            <ImportPage
+              onNavigate={(p) => navigate(`/${p}`)}
+              presetBookId={param ?? undefined}
+            />
+          )}
           {page === 'debug' && <DebugPage />}
           {page === 'account' && <AccountPage />}
           {page === 'roots' && (

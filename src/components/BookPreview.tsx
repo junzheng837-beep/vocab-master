@@ -10,13 +10,15 @@ interface Props {
   bookId: string
   name: string
   custom?: boolean
+  /** 用户自己追加到这本词书里的词 */
+  extraWords?: RawWord[]
   onClose: () => void
 }
 
 const PAGE = 300
 
 /** 词库预览：把一个词书里的所有单词列出来，可搜索 */
-export default function BookPreview({ bookId, name, custom, onClose }: Props) {
+export default function BookPreview({ bookId, name, custom, extraWords, onClose }: Props) {
   const state = useAppState()
   const [words, setWords] = useState<RawWord[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,15 +64,21 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
     listRef.current?.scrollTo({ top: 0 })
   }, [query])
 
+  // 用户追加的词排在最前面，和背单词时的顺序一致
+  const allWords = useMemo(
+    () => (extraWords?.length ? [...extraWords, ...words] : words),
+    [words, extraWords]
+  )
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return words
-    return words.filter(
+    if (!q) return allWords
+    return allWords.filter(
       (w) =>
         w.w.toLowerCase().includes(q) ||
         w.t.some(([, cn]) => cn.toLowerCase().includes(q))
     )
-  }, [words, query])
+  }, [allWords, query])
 
   const shown = filtered.slice(0, visible)
 
@@ -91,7 +99,7 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
             <div className="preview-sub">
               {loading
                 ? '正在载入…'
-                : `共 ${words.length} 个单词${query ? ` · 匹配 ${filtered.length} 个` : ''}`}
+                : `共 ${allWords.length} 个单词${query ? ` · 匹配 ${filtered.length} 个` : ''}`}
             </div>
           </div>
           <button className="icon-btn" title="关闭" onClick={onClose}>
