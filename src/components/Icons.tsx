@@ -144,6 +144,15 @@ export function IconInfo({ size = 16, className }: IconProps) {
   )
 }
 
+export function IconUser({ size = 17, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.8 19.4a7.2 7.2 0 0 1 14.4 0" />
+    </svg>
+  )
+}
+
 export function IconMoon({ size = 16, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>

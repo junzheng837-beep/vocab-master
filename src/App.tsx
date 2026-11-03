@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { store, useAppState } from './core/store'
 import { logger } from './core/logger'
 import Sidebar, { type PageId } from './components/Sidebar'
+import MobileNav from './components/MobileNav'
+import { useDevice } from './core/device'
 import UpdateBanner from './components/UpdateBanner'
 import HomePage from './pages/Home'
 import StudyHome from './pages/StudyHome'
@@ -88,6 +90,8 @@ export default function App() {
   const state = useAppState()
   const [route, setRoute] = useState<Route>(readRoute)
   useTheme()
+  const device = useDevice()
+  const isMobile = device === 'mobile'
 
   useEffect(() => {
     void store.init()
@@ -131,9 +135,10 @@ export default function App() {
 
   const { page, param } = route
   const inStudy = page === 'study'
+  const inSession = inStudy && !!param
 
   return (
-    <div className="window">
+    <div className={`window${isMobile ? ' is-mobile' : ''}${inSession ? ' is-session' : ''}`}>
       <div className="titlebar">
         <div className="traffic">
           <span className="t-red" />
@@ -193,6 +198,10 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {isMobile && !inSession && (
+        <MobileNav page={page} onNavigate={(p) => navigate(`/${p}`)} />
+      )}
     </div>
   )
 }

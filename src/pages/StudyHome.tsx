@@ -142,14 +142,14 @@ export default function StudyHome({ onStart }: Props) {
       </div>
 
       <div
-        className="card"
+        className="card today-card"
         style={{
           padding: '20px 22px',
           background: 'linear-gradient(135deg, rgba(10,132,255,0.10), rgba(10,132,255,0.02))',
           borderColor: 'rgba(10,132,255,0.22)',
         }}
       >
-        <div className="row-between" style={{ alignItems: 'flex-start', gap: 20 }}>
+        <div className="row-between today-card-body" style={{ alignItems: 'flex-start', gap: 20 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>
               今日新学
@@ -176,7 +176,7 @@ export default function StudyHome({ onStart }: Props) {
               />
             </div>
             <div
-              className="row"
+              className="row today-card-stats"
               style={{ marginTop: 12, gap: 20, fontSize: 12.5, color: 'var(--text-secondary)' }}
             >
               <span>
@@ -190,7 +190,7 @@ export default function StudyHome({ onStart }: Props) {
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '0 0 auto' }}>
+          <div className="today-card-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '0 0 auto' }}>
             <button
               className="btn btn-primary btn-lg"
               disabled={!mine.length}

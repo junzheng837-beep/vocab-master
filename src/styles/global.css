@@ -2486,33 +2486,562 @@ textarea.input {
   animation: fadeUp 0.3s var(--ease);
 }
 
-@media (max-width: 720px) {
-  .sidebar {
-    width: 62px;
-    flex: 0 0 62px;
-    padding: 12px 8px;
+/* ==========================================================================
+   移动端
+   设备类型由 src/core/device.ts 打在 <html data-device="mobile|tablet|desktop"> 上。
+   用属性而不是单纯媒体查询，是因为手机横屏时宽度会超过 720px，但布局仍应是手机布局。
+   ========================================================================== */
+
+html[data-device="mobile"] {
+  --mnav-height: 56px;
+}
+
+html[data-device="mobile"] body {
+  overscroll-behavior-y: none;
+}
+
+html[data-device="mobile"] .window {
+  height: 100dvh;
+}
+
+/* ---------- 顶栏 ---------- */
+html[data-device="mobile"] .titlebar {
+  height: calc(48px + env(safe-area-inset-top));
+  flex: 0 0 calc(48px + env(safe-area-inset-top));
+  padding: 0 16px;
+  padding-top: env(safe-area-inset-top);
+  gap: 8px;
+}
+html[data-device="mobile"] .traffic,
+html[data-device="mobile"] .titlebar-actions {
+  display: none;
+}
+html[data-device="mobile"] .titlebar-title {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  opacity: 1;
+}
+
+/* 进入学习会话时让出整屏，顶栏交给学习页自己的进度条 */
+html[data-device="mobile"] .window.is-session .titlebar {
+  display: none;
+}
+
+/* ---------- 侧栏换成底部标签栏 ---------- */
+html[data-device="mobile"] .sidebar {
+  display: none;
+}
+html[data-device="mobile"] .main {
+  padding-bottom: calc(var(--mnav-height) + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+html[data-device="mobile"] .window.is-session .main {
+  padding-bottom: 0;
+}
+
+html[data-device="mobile"] .page {
+  padding: 16px 16px 28px;
+}
+html[data-device="mobile"] .page-header {
+  margin-bottom: 18px;
+}
+html[data-device="mobile"] .page-title {
+  font-size: 22px;
+}
+html[data-device="mobile"] .page-subtitle {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+html[data-device="mobile"] .section-label {
+  margin-top: 20px;
+}
+
+/* ---------- 设置这类左右布局的列表 ---------- */
+html[data-device="mobile"] .list-item {
+  gap: 12px;
+  padding: 13px 14px;
+  flex-wrap: wrap;
+}
+html[data-device="mobile"] .list-item > div:first-child {
+  min-width: 0;
+}
+html[data-device="mobile"] .list-item .card-desc {
+  line-height: 1.55;
+}
+html[data-device="mobile"] .segmented {
+  flex-wrap: wrap;
+}
+html[data-device="mobile"] .segmented-item {
+  height: 30px;
+  padding: 0 11px;
+}
+/* 设置页里紧跟在文字后面的分段控件，手机上单独占一行 */
+html[data-device="mobile"] .list-item > .segmented {
+  flex: 1 1 100%;
+  display: flex;
+  margin-top: 2px;
+}
+html[data-device="mobile"] .list-item > .segmented .segmented-item {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---------- 卡片 / 列表栅格 ---------- */
+html[data-device="mobile"] .stat-grid {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+html[data-device="mobile"] .book-grid {
+  grid-template-columns: 1fr;
+}
+html[data-device="mobile"] .root-grid {
+  grid-template-columns: 1fr;
+}
+html[data-device="mobile"] .letter-grid {
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+html[data-device="mobile"] .letter-tile {
+  padding: 11px 12px;
+}
+html[data-device="mobile"] .letter-char {
+  font-size: 18px;
+}
+
+/* 词书卡片：手机上一行一个，说明文字不用撑高度 */
+html[data-device="mobile"] .book-card {
+  padding: 14px 15px;
+}
+html[data-device="mobile"] .book-desc {
+  min-height: 0;
+}
+
+/* ---------- 学习页 ---------- */
+html[data-device="mobile"] .study-top {
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+html[data-device="mobile"] .study-scope {
+  max-width: 34vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-device="mobile"] .study-counter {
+  font-size: 12px;
+}
+html[data-device="mobile"] .study-body {
+  padding: 0 10px;
+}
+html[data-device="mobile"] .word-area {
+  height: 70%;
+}
+html[data-device="mobile"] .study-body.is-revealed .word-area {
+  height: 24%;
+}
+html[data-device="mobile"] .word-text {
+  font-size: clamp(34px, 11vw, 46px);
+  letter-spacing: -0.022em;
+  padding: 0 6px;
+}
+html[data-device="mobile"] .word-meta {
+  margin-top: 10px;
+  gap: 10px;
+}
+html[data-device="mobile"] .nav-arrow {
+  width: 32px;
+  height: 32px;
+  opacity: 0.7;
+}
+html[data-device="mobile"] .nav-arrow.left {
+  left: 0;
+}
+html[data-device="mobile"] .nav-arrow.right {
+  right: 0;
+}
+/* 展开释义后箭头会压在内容上，收到单词区那一带 */
+html[data-device="mobile"] .study-body.is-revealed .nav-arrow {
+  top: 12%;
+}
+
+/* 释义区：手机上一屏内滚动，避免被底部按钮挤没 */
+html[data-device="mobile"] .reveal-zone {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+html[data-device="mobile"] .study-bottom {
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+}
+html[data-device="mobile"] .rate-row {
+  gap: 8px;
+}
+html[data-device="mobile"] .rate-btn {
+  max-width: none;
+  padding: 10px 6px 11px;
+  min-height: 56px;
+  gap: 2px;
+}
+html[data-device="mobile"] .rate-label {
+  font-size: 13.5px;
+}
+html[data-device="mobile"] .rate-sub {
+  font-size: 10.5px;
+}
+/* 手机没有实体键盘，按键角标和快捷键提示都没意义 */
+html[data-device="mobile"] .rate-key,
+html[data-device="mobile"] .study-hintbar,
+html[data-device="mobile"] .kbd-only {
+  display: none;
+}
+html[data-device="mobile"] .kbd {
+  display: none;
+}
+
+/* ---------- 拼写练习 ---------- */
+html[data-device="mobile"] .spell-card {
+  padding: 18px 14px;
+}
+html[data-device="mobile"] .spell-mask {
+  font-size: clamp(24px, 7.5vw, 34px);
+  letter-spacing: 0.02em;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+html[data-device="mobile"] .spell-mask .mask-blank {
+  opacity: 0.95;
+  color: var(--text-secondary);
+}
+html[data-device="mobile"] .spell-input-row {
+  flex-wrap: wrap;
+}
+html[data-device="mobile"] .spell-input-row .input {
+  flex: 1 1 100%;
+}
+html[data-device="mobile"] .spell-input-row .btn {
+  flex: 1;
+}
+html[data-device="mobile"] .spell-hint-row {
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+html[data-device="mobile"] .spell-hint-text {
+  justify-content: center;
+  text-align: center;
+}
+html[data-device="mobile"] .spell-word-big {
+  font-size: 26px;
+}
+html[data-device="mobile"] .lib-item {
+  flex-direction: column;
+  gap: 10px;
+}
+html[data-device="mobile"] .lib-item-side {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* ---------- 词库预览弹窗：手机全屏 ---------- */
+html[data-device="mobile"] .modal-backdrop {
+  padding: 0;
+  align-items: flex-end;
+}
+html[data-device="mobile"] .modal {
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+  border: none;
+}
+html[data-device="mobile"] .preview-head {
+  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+}
+html[data-device="mobile"] .preview-search {
+  padding: 0 16px 10px;
+}
+html[data-device="mobile"] .preview-row {
+  padding: 9px 16px;
+}
+html[data-device="mobile"] .preview-foot {
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+
+/* ---------- 关于 ---------- */
+html[data-device="mobile"] .about {
+  padding: 18px 16px 16px;
+}
+html[data-device="mobile"] .about-p {
+  font-size: 13px;
+  line-height: 1.85;
+}
+html[data-device="mobile"] .about-contact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+html[data-device="mobile"] .about-contact-actions {
+  flex-wrap: wrap;
+}
+html[data-device="mobile"] .about-contact-actions .btn:first-child {
+  flex: 1 1 auto;
+}
+html[data-device="mobile"] .about-foot {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* 页面标题交给顶栏，正文里不再重复一遍 */
+html[data-device="mobile"] .page-title {
+  display: none;
+}
+html[data-device="mobile"] .page-header {
+  margin-bottom: 14px;
+}
+html[data-device="mobile"] .page-subtitle {
+  color: var(--text-tertiary);
+}
+
+/* 今日学习卡：手机上按钮挪到下面，统计行不再被挤成两行 */
+html[data-device="mobile"] .today-card {
+  padding: 16px !important;
+}
+html[data-device="mobile"] .today-card-body {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 14px !important;
+}
+html[data-device="mobile"] .today-card-actions {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+}
+html[data-device="mobile"] .today-card-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+html[data-device="mobile"] .today-card-stats {
+  gap: 14px !important;
+  flex-wrap: wrap;
+  font-size: 12px !important;
+}
+
+/* ---------- 统计页：习惯卡竖排，热力图横向可滑 ---------- */
+html[data-device="mobile"] .habit {
+  flex-direction: column;
+  gap: 16px;
+}
+html[data-device="mobile"] .habit-stats {
+  flex-direction: row;
+  gap: 22px;
+  width: 100%;
+  min-width: 0;
+}
+html[data-device="mobile"] .habit-stats > div {
+  flex: 1;
+  min-width: 0;
+}
+html[data-device="mobile"] .habit-heat {
+  width: 100%;
+  padding-bottom: 4px;
+}
+html[data-device="mobile"] .heatmap-months {
+  grid-template-columns: repeat(20, 11px);
+}
+html[data-device="mobile"] .heatmap {
+  grid-template-columns: repeat(20, 11px);
+  grid-template-rows: repeat(7, 11px);
+}
+html[data-device="mobile"] .heat-cell {
+  width: 11px;
+  height: 11px;
+}
+
+/* ---------- 首页 / 统计里的行内排版 ---------- */
+html[data-device="mobile"] .row-between {
+  gap: 10px;
+}
+html[data-device="mobile"] .heatmap-wrap {
+  overflow-x: auto;
+}
+
+/* ==========================================================================
+   底部标签栏
+   ========================================================================== */
+
+.mnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  height: calc(var(--mnav-height) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--titlebar);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border-top: 1px solid var(--separator);
+}
+.mnav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-tertiary);
+  background: transparent;
+  transition: color 0.16s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.mnav-item.active {
+  color: var(--accent);
+}
+.mnav-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+}
+.mnav-label {
+  font-size: 10.5px;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+}
+.mnav-badge {
+  position: absolute;
+  top: -3px;
+  left: 11px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 更多面板 ---------- */
+.mnav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  animation: fade-in 0.18s var(--ease);
+}
+.mnav-sheet {
+  width: 100%;
+  background: var(--bg-solid);
+  border-radius: 20px 20px 0 0;
+  padding: 8px 14px calc(14px + env(safe-area-inset-bottom));
+  animation: sheetUp 0.24s var(--ease);
+  border-top: 1px solid var(--separator);
+}
+@keyframes sheetUp {
+  from {
+    transform: translateY(18px);
+    opacity: 0.6;
   }
-  .sidebar .nav-label,
-  .sidebar-section {
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.mnav-sheet-grip {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--separator-strong);
+  margin: 6px auto 14px;
+}
+.mnav-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.mnav-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  text-align: left;
+}
+.mnav-sheet-item.active {
+  background: var(--accent-soft);
+}
+.mnav-sheet-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+}
+.mnav-sheet-item.active .mnav-sheet-icon {
+  background: var(--accent);
+  color: #fff;
+}
+.mnav-sheet-icon .mnav-badge {
+  left: 22px;
+  top: -4px;
+}
+.mnav-sheet-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mnav-sheet-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.mnav-sheet-desc {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mnav-sheet-close {
+  width: 100%;
+  height: 42px;
+  margin-top: 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+/* 超窄屏再收一档 */
+@media (max-width: 380px) {
+  html[data-device="mobile"] .rate-sub {
     display: none;
   }
-  .nav-item {
-    justify-content: center;
-    padding: 9px;
+  html[data-device="mobile"] .letter-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
-  .nav-badge {
-    display: none;
-  }
-  .page {
-    padding: 20px 18px 50px;
-  }
-  .word-text {
-    font-size: 40px;
-  }
-  .rate-row {
-    gap: 6px;
-  }
-  .rate-sub {
-    display: none;
+  html[data-device="mobile"] .stat-grid {
+    grid-template-columns: 1fr;
   }
 }

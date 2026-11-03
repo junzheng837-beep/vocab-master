@@ -307,7 +307,7 @@ export default function StudyView({ scope }: { scope: string }) {
           {!revealed ? (
             <div className="reveal-hint">
               <span>点击此处查看释义</span>
-              <span>
+              <span className="kbd-only">
                 或按 <span className="kbd">空格</span>
               </span>
             </div>
