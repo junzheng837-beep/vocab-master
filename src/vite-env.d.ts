@@ -18,7 +18,7 @@ interface DesktopBridge {
   isDesktop: true
   version: string
   checkForUpdates: () => Promise<DesktopUpdateResult>
-  downloadAndInstall: () => Promise<void>
+  downloadAndInstall: () => Promise<{ ok: boolean; error?: string }>
   openExternal: (url: string) => Promise<void>
 }
 

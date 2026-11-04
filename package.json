@@ -1,7 +1,7 @@
 {
   "name": "shici",
   "private": true,
-  "version": "0.9.9",
+  "version": "0.10.0",
   "description": "拾词易记 — 拾起每一个词，记得更久",
   "author": "junzheng837-beep",
   "type": "module",
@@ -74,10 +74,14 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "junzheng837-beep",
-        "repo": "vocab-master"
+        "provider": "generic",
+        "url": "https://junzheng837-beep.github.io/vocab-master/download/"
       }
-    ]
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "compression": "maximum"
   }
 }

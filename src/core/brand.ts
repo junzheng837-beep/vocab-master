@@ -27,8 +27,13 @@ export const REPO_URL = `https://github.com/${BRAND.repo}`
 export const RELEASES_URL = `${REPO_URL}/releases`
 export const LATEST_RELEASE_URL = `${REPO_URL}/releases/latest`
 export const LATEST_API = `https://api.github.com/repos/${BRAND.repo}/releases/latest`
-/** 安装包直链：文件名固定，所以可以用 latest/download 的永久地址 */
-export const SETUP_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/shici-setup.exe`
+/**
+ * 安装包也优先从站点下载，理由同下：GitHub 的 release 资源在国内经常卡住。
+ * 站点上的包由 CI 每次发版后同步过去。
+ */
+export const SETUP_DOWNLOAD_URL = `${BRAND.homepage}download/shici-setup.exe`
+/** 站点上没有包时退回 GitHub */
+export const SETUP_DOWNLOAD_FALLBACK = `${REPO_URL}/releases/latest/download/shici-setup.exe`
 /**
  * APK 优先从站点下载。
  * GitHub 的 release 资源走 objects.githubusercontent.com，国内经常卡在 0%；

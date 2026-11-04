@@ -46,7 +46,9 @@ export default function UpdateBanner() {
     }
     setBusy(true)
     try {
-      await window.shici.downloadAndInstall()
+      const r = await window.shici.downloadAndInstall()
+      // 自动更新失败（比如站点上的版本信息还没同步过来）就直接给下载页
+      if (r && r.ok === false) download()
     } finally {
       setBusy(false)
     }

@@ -133,12 +133,14 @@ ipcMain.handle('update:check', async () => {
 })
 
 ipcMain.handle('update:install', async () => {
-  if (!autoUpdater) return
+  if (!autoUpdater) return { ok: false, error: '当前版本不支持自动更新' }
   try {
     await autoUpdater.downloadUpdate()
     autoUpdater.quitAndInstall()
+    return { ok: true }
   } catch (err) {
     console.error('[update] 下载安装失败', err)
+    return { ok: false, error: String(err) }
   }
 })
 

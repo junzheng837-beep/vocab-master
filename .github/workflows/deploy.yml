@@ -45,7 +45,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p dist/download
-          gh release download --repo "${{ github.repository }}" --pattern "*.apk" --dir dist/download --clobber || true
+          gh release download --repo "${{ github.repository }}" \
+            --pattern "*.apk" --pattern "*.exe" --pattern "latest.yml" \
+            --dir dist/download --clobber || true
           ls -lh dist/download || true
 
       - name: Configure Pages
