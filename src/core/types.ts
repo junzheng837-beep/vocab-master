@@ -84,6 +84,8 @@ export interface Settings {
   /** 参与学习的词书 */
   activeBooks: string[]
   theme: 'auto' | 'light' | 'dark'
+  /** 单词出现时自动朗读一遍 */
+  speakOnWord: boolean
   /** 显示释义后自动发音 */
   autoSpeak: boolean
   /** 自定义词库的新词顺序：导入顺序 / 随机打乱 */

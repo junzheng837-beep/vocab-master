@@ -77,9 +77,32 @@ export default function StudyView({ scope }: { scope: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, session.built, session.scope, state.ready])
 
+  /** 已经读过音的 entryId，避免「出现时读一遍」和「展开时再读」重复 */
+  const spokenRef = useRef<string | null>(null)
+
+  /**
+   * 单词跳出来就自动读一遍。
+   * 浏览器要求先有用户操作才允许发声，所以刚打开时第一个词读不出来，
+   * 等用户点过一次之后才开始自动读，免得每次进页面都弹「没有听到声音」。
+   */
+  useEffect(() => {
+    if (!settings.speakOnWord || !entry) return
+    if (spokenRef.current === entry.entryId) return
+    const ua = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } })
+      .userActivation
+    if (ua && !ua.hasBeenActive) return
+    spokenRef.current = entry.entryId
+    speak(entry.word.w)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry?.entryId, settings.speakOnWord])
+
   const reveal = () => {
     store.reveal()
-    if (settings.autoSpeak && entry) speak(entry.word.w)
+    if (!settings.autoSpeak || !entry) return
+    // 出现时已经读过就不再读第二遍
+    if (spokenRef.current === entry.entryId) return
+    spokenRef.current = entry.entryId
+    speak(entry.word.w)
   }
 
   const checkSpell = () => {

@@ -73,6 +73,17 @@ export default function SettingsPage({ onNavigate }: { onNavigate: (p: PageId) =
         </div>
         <div className="list-item">
           <div style={{ flex: 1 }}>
+            <div className="card-title">单词出现时自动朗读</div>
+            <div className="card-desc">每跳出一个新词就自动读一遍，不用手动点小喇叭</div>
+          </div>
+          <button
+            className={`switch ${settings.speakOnWord ? 'on' : ''}`}
+            onClick={() => void store.updateSettings({ speakOnWord: !settings.speakOnWord })}
+            aria-label="单词出现时自动朗读"
+          />
+        </div>
+        <div className="list-item">
+          <div style={{ flex: 1 }}>
             <div className="card-title">显示释义后自动发音</div>
             <div className="card-desc">
               {isWeChatBrowser()

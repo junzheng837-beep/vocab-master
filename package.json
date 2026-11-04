@@ -1,7 +1,7 @@
 {
   "name": "shici",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "拾词易记 — 拾起每一个词，记得更久",
   "author": "junzheng837-beep",
   "type": "module",

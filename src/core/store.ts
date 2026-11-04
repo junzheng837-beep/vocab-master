@@ -70,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dailyReview: 200,
   activeBooks: ['cet4'],
   theme: 'auto',
+  speakOnWord: true,
   autoSpeak: false,
   customOrder: 'import',
   spellMode: false,
