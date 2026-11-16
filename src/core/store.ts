@@ -59,6 +59,10 @@ export interface AppState {
   spellList: SpellItem[]
   /** 内置词库里用户追加的单词 */
   bookExtras: Record<string, RawWord[]>
+  /** 用户给某本词书定制的顺序 */
+  bookOrder: Record<string, string[]>
+  /** 用户从内置词书里删掉的词 */
+  bookDeleted: Record<string, string[]>
   manifest: BookMeta[]
   books: Record<string, BookData>
   session: SessionState
@@ -114,6 +118,8 @@ class AppStore {
     customBooks: [],
     spellList: [],
     bookExtras: {},
+    bookOrder: {},
+    bookDeleted: {},
     manifest: [],
     books: {},
     session: emptySession,
@@ -190,14 +196,17 @@ class AppStore {
       this.set({ cloud: { enabled: true, ...this.sync.getStatus() } })
     }
 
-    const [settings, logs, customBooks, stateMap, spellList, bookExtras] = await Promise.all([
-      this.driver.get<Settings>(this.keys.settings),
-      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
-      this.driver.get<CustomBook[]>(this.keys.customBooks),
-      this.driver.entries<WordState>(this.keys.statePrefix),
-      this.driver.get<SpellItem[]>(this.keys.spellList),
-      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
-    ])
+    const [settings, logs, customBooks, stateMap, spellList, bookExtras, bookOrder, bookDeleted] =
+      await Promise.all([
+        this.driver.get<Settings>(this.keys.settings),
+        this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+        this.driver.get<CustomBook[]>(this.keys.customBooks),
+        this.driver.entries<WordState>(this.keys.statePrefix),
+        this.driver.get<SpellItem[]>(this.keys.spellList),
+        this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
+        this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
+        this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
+      ])
 
     const states: Record<string, WordState> = {}
     for (const [k, v] of Object.entries(stateMap)) {
@@ -220,10 +229,12 @@ class AppStore {
       customBooks: customBooks ?? [],
       spellList: spellList ?? [],
       bookExtras: bookExtras ?? {},
+      bookOrder: bookOrder ?? {},
+      bookDeleted: bookDeleted ?? {},
       states,
       session: { ...emptySession },
     })
-    this.mergedBooks.clear()
+    this.invalidateBook()
   }
 
   /* ------------------------------------------------------------ 账号 */
@@ -267,14 +278,17 @@ class AppStore {
     await this.sync.flush()
     await this.sync.pull()
 
-    const [settings, logs, customBooks, stateMap, spellList, bookExtras] = await Promise.all([
-      this.driver.get<Settings>(this.keys.settings),
-      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
-      this.driver.get<CustomBook[]>(this.keys.customBooks),
-      this.driver.entries<WordState>(this.keys.statePrefix),
-      this.driver.get<SpellItem[]>(this.keys.spellList),
-      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
-    ])
+    const [settings, logs, customBooks, stateMap, spellList, bookExtras, bookOrder, bookDeleted] =
+      await Promise.all([
+        this.driver.get<Settings>(this.keys.settings),
+        this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+        this.driver.get<CustomBook[]>(this.keys.customBooks),
+        this.driver.entries<WordState>(this.keys.statePrefix),
+        this.driver.get<SpellItem[]>(this.keys.spellList),
+        this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
+        this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
+        this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
+      ])
 
     const states: Record<string, WordState> = {}
     for (const [k, v] of Object.entries(stateMap)) {
@@ -287,10 +301,12 @@ class AppStore {
       customBooks: customBooks ?? [],
       spellList: spellList ?? [],
       bookExtras: bookExtras ?? {},
+      bookOrder: bookOrder ?? {},
+      bookDeleted: bookDeleted ?? {},
       states,
       cloud: { enabled: true, ...this.sync.getStatus() },
     })
-    this.mergedBooks.clear()
+    this.invalidateBook()
     logger.info('cloud', '手动同步完成')
   }
 
@@ -383,8 +399,17 @@ class AppStore {
     }
   }
 
-  /** 合并后的词书缓存，键是 bookId，长度对不上就重建 */
+  /**
+   * 合并后的词书缓存。
+   * 追加词、删除词、自定义顺序都会影响结果，改动时统一 invalidateBook()。
+   */
   private mergedBooks = new Map<string, BookData>()
+
+  /** 清掉某本书的合并缓存；不传就全清 */
+  private invalidateBook(id?: string) {
+    if (id) this.mergedBooks.delete(id)
+    else this.mergedBooks.clear()
+  }
 
   private bookData(id: string): BookData | undefined {
     const base =
@@ -396,17 +421,31 @@ class AppStore {
     if (!base) return undefined
 
     const extras = this.state.bookExtras[id]
-    if (!extras?.length) return base
+    const deleted = this.state.bookDeleted[id]
+    const order = this.state.bookOrder[id]
+    if (!extras?.length && !deleted?.length && !order?.length) return base
 
     const cached = this.mergedBooks.get(id)
-    if (cached && cached.words.length === base.words.length + extras.length) return cached
+    if (cached) return cached
 
     // 追加的词排在前面：内置词书按词频排序，几千个词排在队尾等于永远轮不到
-    const merged: BookData = {
-      ...base,
-      wordCount: base.words.length + extras.length,
-      words: [...extras, ...base.words],
+    let words = extras?.length ? [...extras, ...base.words] : [...base.words]
+
+    if (deleted?.length) {
+      const gone = new Set(deleted)
+      words = words.filter((w) => !gone.has(w.w.toLowerCase()))
     }
+
+    if (order?.length) {
+      const rank = new Map(order.map((k, i) => [k, i]))
+      // 不在顺序表里的词（后来新加的）排在最后，保持原有相对顺序
+      words = words
+        .map((w, i) => ({ w, r: rank.get(w.w.toLowerCase()) ?? Number.MAX_SAFE_INTEGER, i }))
+        .sort((a, b) => a.r - b.r || a.i - b.i)
+        .map((x) => x.w)
+    }
+
+    const merged: BookData = { ...base, wordCount: words.length, words }
     this.mergedBooks.set(id, merged)
     return merged
   }
@@ -507,6 +546,58 @@ class AppStore {
         : settings.activeBooks.filter((id) => knownIds.has(id))
 
     await this.ensureBooks(activeIds.filter((id) => !id.startsWith('custom:')))
+
+    /* ------------------------------------------------ 单本词书：整本按顺序过 */
+    // 点进某一本词书时，不受「每天新词数」限制：
+    // 没背完就从第一个没背过的词接着来，整本背完后再进来就是整本复习。
+    if (scope.kind === 'book' && activeIds.length === 1) {
+      const bookId = activeIds[0]
+      const book = this.bookData(bookId)
+      if (book) {
+        let words = book.words
+        if (scope.group) words = words.filter((w) => w.g === scope.group)
+
+        const unlearned = words.filter(
+          (w) => !this.state.states[`${bookId}::${w.w.toLowerCase()}`]
+        )
+        const reviewing = unlearned.length === 0
+        const source = reviewing ? words : unlearned
+
+        for (const w of source) {
+          const key = `${bookId}::${w.w.toLowerCase()}`
+          const st = this.state.states[key]
+          entries.push({
+            entryId: this.nextId('e'),
+            key,
+            bookId,
+            word: w,
+            isNew: !st,
+            done: false,
+            retried: 0,
+            reps: st?.reps ?? 0,
+          })
+        }
+
+        logger.info('session', reviewing ? '整本复习' : '接着上次背', {
+          词书: book.name,
+          总数: words.length,
+          剩余: unlearned.length,
+          本轮: entries.length,
+        })
+        this.set({
+          session: {
+            entries,
+            cursor: 0,
+            revealed: false,
+            built: true,
+            loading: false,
+            error: null,
+            scope: scopeParam,
+          },
+        })
+        return
+      }
+    }
 
     // 1. 取新词（各词书轮转，保证混合）
     const pools: { bookId: string; words: BookData['words'] }[] = []
@@ -1002,7 +1093,7 @@ class AppStore {
 
     const prev = this.state.bookExtras[bookId] ?? []
     const bookExtras = { ...this.state.bookExtras, [bookId]: [...prev, ...fresh] }
-    this.mergedBooks.delete(bookId)
+    this.invalidateBook(bookId)
     this.set({ bookExtras })
     await this.driver.set(this.keys.bookExtras, bookExtras)
     logger.info('import', '已追加到内置词书', {
@@ -1013,6 +1104,99 @@ class AppStore {
       现有: book.words.length + fresh.length,
     })
     return { added: fresh.length, skipped, bookName: book.name }
+  }
+
+  /* ------------------------------------------------------- 词书顺序 / 删词 */
+
+  /** 这本书是否被打乱过 */
+  isBookShuffled(bookId: string): boolean {
+    return (this.state.bookOrder[bookId]?.length ?? 0) > 0
+  }
+
+  /**
+   * 打乱某本词书的顺序，可以反复打乱。
+   * 最初顺序始终保存在原始数据里，恢复时只要把这张表删掉即可。
+   */
+  async shuffleBook(bookId: string): Promise<number> {
+    const book = this.bookData(bookId)
+    if (!book?.words.length) return 0
+
+    const keys = book.words.map((w) => w.w.toLowerCase())
+    let next = shuffle(keys)
+    // 万一随机出来和原来一样，再摇一次
+    for (let i = 0; i < 5 && next.every((k, idx) => k === keys[idx]); i += 1) {
+      next = shuffle(keys)
+    }
+
+    const bookOrder = { ...this.state.bookOrder, [bookId]: next }
+    this.invalidateBook(bookId)
+    this.set({ bookOrder })
+    await this.driver.set(this.keys.bookOrder, bookOrder)
+    logger.info('library', '词书顺序已打乱', { bookId, 词数: next.length })
+    return next.length
+  }
+
+  /** 恢复最初的导入顺序 */
+  async resetBookOrder(bookId: string) {
+    if (!this.state.bookOrder[bookId]) return
+    const bookOrder = { ...this.state.bookOrder }
+    delete bookOrder[bookId]
+    this.invalidateBook(bookId)
+    this.set({ bookOrder })
+    await this.driver.set(this.keys.bookOrder, bookOrder)
+    logger.info('library', '词书顺序已恢复', { bookId })
+  }
+
+  /**
+   * 从词书里删掉一个词。
+   * 自建词书直接删数据；内置词书改不了源文件，记到屏蔽表里。
+   */
+  async removeWordFromBook(bookId: string, word: string) {
+    const key = word.trim().toLowerCase()
+    if (!key) return
+    const isCustom = this.state.customBooks.some((b) => b.id === bookId)
+
+    if (isCustom) {
+      const customBooks = this.state.customBooks.map((b) =>
+        b.id === bookId
+          ? {
+              ...b,
+              words: b.words.filter((w) => w.w.toLowerCase() !== key),
+              updatedAt: Date.now(),
+            }
+          : b
+      )
+      this.invalidateBook(bookId)
+      this.set({ customBooks })
+      await this.driver.set(this.keys.customBooks, customBooks)
+    } else {
+      const prev = this.state.bookDeleted[bookId] ?? []
+      if (!prev.includes(key)) {
+        const bookDeleted = { ...this.state.bookDeleted, [bookId]: [...prev, key] }
+        this.invalidateBook(bookId)
+        this.set({ bookDeleted })
+        await this.driver.set(this.keys.bookDeleted, bookDeleted)
+      }
+    }
+
+    // 顺序表里也去掉，免得越积越长
+    const order = this.state.bookOrder[bookId]
+    if (order?.includes(key)) {
+      const bookOrder = { ...this.state.bookOrder, [bookId]: order.filter((k) => k !== key) }
+      this.set({ bookOrder })
+      await this.driver.set(this.keys.bookOrder, bookOrder)
+    }
+
+    // 学习记录一起清掉，统计里不留一个已经不存在的词
+    const stateKey = `${bookId}::${key}`
+    if (this.state.states[stateKey]) {
+      const states = { ...this.state.states }
+      delete states[stateKey]
+      this.set({ states })
+      await this.driver.remove(this.keys.state(stateKey))
+    }
+
+    logger.info('library', '从词书里删除单词', { bookId, word })
   }
 
   async removeCustomBook(id: string) {

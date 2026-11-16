@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useAppState } from '../core/store'
+import { store, useAppState } from '../core/store'
 import { loadBook } from '../core/dict'
 import { speak } from '../core/speech'
 import { logger } from '../core/logger'
@@ -12,18 +12,28 @@ interface Props {
   custom?: boolean
   /** 用户自己追加到这本词书里的词 */
   extraWords?: RawWord[]
+  /** 用户已经删掉的词（内置词书用屏蔽表实现） */
+  deletedWords?: string[]
   onClose: () => void
 }
 
 const PAGE = 300
 
 /** 词库预览：把一个词书里的所有单词列出来，可搜索 */
-export default function BookPreview({ bookId, name, custom, extraWords, onClose }: Props) {
+export default function BookPreview({
+  bookId,
+  name,
+  custom,
+  extraWords,
+  deletedWords,
+  onClose,
+}: Props) {
   const state = useAppState()
   const [words, setWords] = useState<RawWord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
   const [visible, setVisible] = useState(PAGE)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -64,11 +74,18 @@ export default function BookPreview({ bookId, name, custom, extraWords, onClose 
     listRef.current?.scrollTo({ top: 0 })
   }, [query])
 
-  // 用户追加的词排在最前面，和背单词时的顺序一致
-  const allWords = useMemo(
-    () => (extraWords?.length ? [...extraWords, ...words] : words),
-    [words, extraWords]
-  )
+  // 用户追加的词排在最前面，和背单词时的顺序一致；已删掉的过滤掉
+  const allWords = useMemo(() => {
+    const base = extraWords?.length ? [...extraWords, ...words] : words
+    const gone = new Set([...(deletedWords ?? []), ...removed])
+    return gone.size ? base.filter((w) => !gone.has(w.w.toLowerCase())) : base
+  }, [words, extraWords, deletedWords, removed])
+
+  const removeWord = (w: RawWord) => {
+    if (!window.confirm(`从「${name}」里删掉 “${w.w}”？`)) return
+    setRemoved((prev) => new Set(prev).add(w.w.toLowerCase()))
+    void store.removeWordFromBook(bookId, w.w)
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -151,6 +168,15 @@ export default function BookPreview({ bookId, name, custom, extraWords, onClose 
                   <IconSpeaker size={12} />
                 </button>
                 {w.g && <span className="preview-tag">{w.g}</span>}
+                <button
+                  className="preview-del"
+                  title="从词书里删掉这个词"
+                  onClick={() => removeWord(w)}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 7h16M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7M6.5 7l.8 12.1A1.9 1.9 0 0 0 9.2 21h5.6a1.9 1.9 0 0 0 1.9-1.9L17.5 7" />
+                  </svg>
+                </button>
               </div>
               <div className="preview-trans">
                 {w.t.length

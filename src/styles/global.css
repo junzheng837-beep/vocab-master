@@ -2311,6 +2311,30 @@ textarea.input {
   background: var(--bg-elevated-2);
   color: var(--accent);
 }
+.preview-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  border-radius: 5px;
+  color: var(--text-tertiary);
+  opacity: 0.32;
+  transition: opacity 0.12s var(--ease), color 0.12s var(--ease), background 0.12s var(--ease);
+}
+.preview-row:hover .preview-del,
+.preview-del:focus-visible {
+  opacity: 1;
+}
+.preview-del:hover {
+  background: rgba(255, 69, 58, 0.12);
+  color: var(--red);
+}
+@media (hover: none) {
+  /* 手机上没有 hover，删除按钮亮一点，方便发现 */
+  .preview-del { opacity: 0.55; }
+}
 .preview-tag {
   font-size: 10px;
   padding: 0 6px;

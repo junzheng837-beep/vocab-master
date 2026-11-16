@@ -66,7 +66,14 @@ export default function StudyView({ scope }: { scope: string }) {
   // 进入页面时按当前范围准备会话；已经在学同一个范围则保持进度
   useEffect(() => {
     if (!state.ready) return
-    if (session.built && session.scope === scope) return
+    // 上一轮已经背完了，重新点进来就开新的一轮，而不是停在完成页
+    const finished =
+      session.built &&
+      session.scope === scope &&
+      !session.loading &&
+      session.entries.length > 0 &&
+      session.cursor >= session.entries.length
+    if (session.built && session.scope === scope && !finished) return
     const parsed = parseScope(scope)
     if (parsed.kind === 'book' && !state.settings.activeBooks.includes(parsed.bookId)) {
       // 从公共词库点进来的，先加入「我的词库」再开始
@@ -252,8 +259,8 @@ export default function StudyView({ scope }: { scope: string }) {
           <button className="btn btn-primary" onClick={() => void store.rebuildSession(scope)}>
             再学一轮
           </button>
-          <button className="btn" onClick={() => (window.location.hash = '/study')}>
-            换一本词书
+          <button className="btn" onClick={() => (window.location.hash = '/home')}>
+            返回主页
           </button>
         </div>
       </div>
@@ -310,6 +317,7 @@ export default function StudyView({ scope }: { scope: string }) {
             {entry.isNew && <span className="word-badge new">新词</span>}
             {!entry.isNew && entry.retried === 0 && <span className="word-badge">复习</span>}
             {entry.retried > 0 && <span className="word-badge retry">第 {entry.retried + 1} 次</span>}
+            {entry.reps ? <span className="word-badge">背过 {entry.reps} 次</span> : null}
             {entry.word.g && <span className="word-badge">{entry.word.g}</span>}
             <button
               className={`word-badge spell-toggle ${inSpell ? 'on' : ''}`}

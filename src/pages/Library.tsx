@@ -33,7 +33,10 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
   const allBooks = [
     ...manifest.map((m) => ({
       ...m,
-      count: m.count + (state.bookExtras[m.id]?.length ?? 0),
+      count: Math.max(
+        0,
+        m.count + (state.bookExtras[m.id]?.length ?? 0) - (state.bookDeleted[m.id]?.length ?? 0)
+      ),
       custom: false,
     })),
     ...customBooks.map((b) => ({
@@ -107,6 +110,28 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                         <span>
                           {learned} / {b.count} 词
                         </span>
+                        <button
+                          className="preview-link"
+                          title="随机打乱这本书的背词顺序"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void store.shuffleBook(b.id)
+                          }}
+                        >
+                          打乱
+                        </button>
+                        {state.bookOrder[b.id]?.length ? (
+                          <button
+                            className="preview-link"
+                            title="恢复到最初的顺序"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void store.resetBookOrder(b.id)
+                            }}
+                          >
+                            恢复
+                          </button>
+                        ) : null}
                         <button
                           className="preview-link"
                           onClick={(e) => {
@@ -204,6 +229,28 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                     </span>
                     <button
                       className="preview-link"
+                      title="随机打乱这本书的背词顺序"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void store.shuffleBook(b.id)
+                      }}
+                    >
+                      打乱
+                    </button>
+                    {state.bookOrder[b.id]?.length ? (
+                      <button
+                        className="preview-link"
+                        title="恢复到最初的顺序"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void store.resetBookOrder(b.id)
+                        }}
+                      >
+                        恢复
+                      </button>
+                    ) : null}
+                    <button
+                      className="preview-link"
                       onClick={(e) => {
                         e.stopPropagation()
                         window.location.hash = `/import/${b.id}`
@@ -244,6 +291,7 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           name={preview.name}
           custom={preview.custom}
           extraWords={state.bookExtras[preview.id]}
+          deletedWords={state.bookDeleted[preview.id]}
           onClose={() => setPreview(null)}
         />
       )}

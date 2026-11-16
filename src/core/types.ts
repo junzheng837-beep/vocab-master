@@ -191,4 +191,6 @@ export interface SessionEntry {
   done: boolean
   /** 本轮内被重新排队的次数 */
   retried: number
+  /** 这个词之前背过几次，用于「整本复习」时标注 */
+  reps?: number
 }

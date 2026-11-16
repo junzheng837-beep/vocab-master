@@ -169,6 +169,10 @@ export function makeKeys(prefix: string) {
     spellList: `${prefix}cfg:spellList`,
     /** 内置词库里用户自己加的单词：{ [bookId]: RawWord[] } */
     bookExtras: `${prefix}cfg:bookExtras`,
+    /** 用户给某本词书定制的顺序：{ [bookId]: 小写单词数组 } */
+    bookOrder: `${prefix}cfg:bookOrder`,
+    /** 用户从内置词书里删掉的词：{ [bookId]: 小写单词数组 } */
+    bookDeleted: `${prefix}cfg:bookDeleted`,
     statePrefix: `${prefix}state:`,
     state: (key: string) => `${prefix}state:${key}`,
   }
