@@ -1118,7 +1118,10 @@ class AppStore {
 
   /** 词书内容或顺序变了，如果正在背这本书，把会话作废等下次重建 */
   private resetSessionFor(bookId: string) {
-    if (this.state.session.built && this.state.session.scope === bookId) {
+    const scope = this.state.session.scope
+    // 整本（cet4）和分组（cet4::餐饮）两种范围都算
+    const hit = !!scope && (scope === bookId || scope.startsWith(`${bookId}::`))
+    if (this.state.session.built && hit) {
       this.set({ session: { ...emptySession } })
       logger.debug('session', '词书有变动，清空当前会话', { bookId })
     }
