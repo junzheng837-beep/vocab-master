@@ -290,8 +290,6 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           bookId={preview.id}
           name={preview.name}
           custom={preview.custom}
-          extraWords={state.bookExtras[preview.id]}
-          deletedWords={state.bookDeleted[preview.id]}
           onClose={() => setPreview(null)}
         />
       )}

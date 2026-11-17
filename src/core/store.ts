@@ -877,12 +877,20 @@ class AppStore {
     const { entries, cursor } = this.state.session
     if (!entries.length) return
     let i = cursor
-    for (let step = 0; step < entries.length; step += 1) {
-      i += delta
-      if (i < 0) i = entries.length - 1
-      if (i >= entries.length) i = 0
-      if (!entries[i].done) break
+
+    if (delta < 0) {
+      // 往回翻就是看上一个词：不跳过已经评过的，也不从第一个绕到最后一个
+      i = Math.max(0, cursor - 1)
+    } else {
+      // 往前翻要跳过评过的，找到下一个还没背的
+      for (let step = 0; step < entries.length; step += 1) {
+        i += 1
+        if (i >= entries.length) i = 0
+        if (!entries[i].done) break
+      }
     }
+
+    if (i === cursor) return
     this.set({ session: { ...this.state.session, cursor: i, revealed: false } })
   }
 
@@ -1108,6 +1116,21 @@ class AppStore {
 
   /* ------------------------------------------------------- 词书顺序 / 删词 */
 
+  /** 词书内容或顺序变了，如果正在背这本书，把会话作废等下次重建 */
+  private resetSessionFor(bookId: string) {
+    if (this.state.session.built && this.state.session.scope === bookId) {
+      this.set({ session: { ...emptySession } })
+      logger.debug('session', '词书有变动，清空当前会话', { bookId })
+    }
+  }
+
+  /** 预览用：合并追加词、去掉已删的词、按自定义顺序排好 */
+  async getBookWords(bookId: string): Promise<RawWord[]> {
+    const isCustom = this.state.customBooks.some((b) => b.id === bookId)
+    if (!isCustom) await this.ensureBooks([bookId])
+    return this.bookData(bookId)?.words ?? []
+  }
+
   /** 这本书是否被打乱过 */
   isBookShuffled(bookId: string): boolean {
     return (this.state.bookOrder[bookId]?.length ?? 0) > 0
@@ -1130,6 +1153,7 @@ class AppStore {
 
     const bookOrder = { ...this.state.bookOrder, [bookId]: next }
     this.invalidateBook(bookId)
+    this.resetSessionFor(bookId)
     this.set({ bookOrder })
     await this.driver.set(this.keys.bookOrder, bookOrder)
     logger.info('library', '词书顺序已打乱', { bookId, 词数: next.length })
@@ -1142,6 +1166,7 @@ class AppStore {
     const bookOrder = { ...this.state.bookOrder }
     delete bookOrder[bookId]
     this.invalidateBook(bookId)
+    this.resetSessionFor(bookId)
     this.set({ bookOrder })
     await this.driver.set(this.keys.bookOrder, bookOrder)
     logger.info('library', '词书顺序已恢复', { bookId })
@@ -1167,6 +1192,7 @@ class AppStore {
           : b
       )
       this.invalidateBook(bookId)
+      this.resetSessionFor(bookId)
       this.set({ customBooks })
       await this.driver.set(this.keys.customBooks, customBooks)
     } else {
@@ -1174,6 +1200,7 @@ class AppStore {
       if (!prev.includes(key)) {
         const bookDeleted = { ...this.state.bookDeleted, [bookId]: [...prev, key] }
         this.invalidateBook(bookId)
+        this.resetSessionFor(bookId)
         this.set({ bookDeleted })
         await this.driver.set(this.keys.bookDeleted, bookDeleted)
       }

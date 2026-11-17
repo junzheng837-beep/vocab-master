@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { store, useAppState } from '../core/store'
-import { loadBook } from '../core/dict'
+import { store } from '../core/store'
 import { speak } from '../core/speech'
 import { logger } from '../core/logger'
 import type { RawWord } from '../core/types'
@@ -10,25 +9,13 @@ interface Props {
   bookId: string
   name: string
   custom?: boolean
-  /** 用户自己追加到这本词书里的词 */
-  extraWords?: RawWord[]
-  /** 用户已经删掉的词（内置词书用屏蔽表实现） */
-  deletedWords?: string[]
   onClose: () => void
 }
 
 const PAGE = 300
 
 /** 词库预览：把一个词书里的所有单词列出来，可搜索 */
-export default function BookPreview({
-  bookId,
-  name,
-  custom,
-  extraWords,
-  deletedWords,
-  onClose,
-}: Props) {
-  const state = useAppState()
+export default function BookPreview({ bookId, name, custom, onClose }: Props) {
   const [words, setWords] = useState<RawWord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -43,11 +30,8 @@ export default function BookPreview({
     setError(null)
     logger.info('preview', '打开词库预览', { bookId, name, custom: !!custom })
 
-    const task = custom
-      ? Promise.resolve(
-          state.customBooks.find((b) => b.id === bookId)?.words ?? []
-        )
-      : loadBook(bookId).then((b) => b.words)
+    // 走 store 而不是直接读数据文件：这样追加词、删词、打乱后的顺序都能体现出来
+    const task = store.getBookWords(bookId)
 
     task
       .then((list) => {
@@ -74,12 +58,11 @@ export default function BookPreview({
     listRef.current?.scrollTo({ top: 0 })
   }, [query])
 
-  // 用户追加的词排在最前面，和背单词时的顺序一致；已删掉的过滤掉
-  const allWords = useMemo(() => {
-    const base = extraWords?.length ? [...extraWords, ...words] : words
-    const gone = new Set([...(deletedWords ?? []), ...removed])
-    return gone.size ? base.filter((w) => !gone.has(w.w.toLowerCase())) : base
-  }, [words, extraWords, deletedWords, removed])
+  // store 已经处理过追加词 / 删除 / 顺序，这里只需要滤掉刚点删的那几个（即时反馈）
+  const allWords = useMemo(
+    () => (removed.size ? words.filter((w) => !removed.has(w.w.toLowerCase())) : words),
+    [words, removed]
+  )
 
   const removeWord = (w: RawWord) => {
     if (!window.confirm(`从「${name}」里删掉 “${w.w}”？`)) return
