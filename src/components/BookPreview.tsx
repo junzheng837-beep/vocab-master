@@ -31,6 +31,7 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
   const [query, setQuery] = useState('')
   const [removed, setRemoved] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<string[]>(getSelection)
+  const [msg, setMsg] = useState('')
 
   useEffect(() => subscribeSelection(() => setPicked(getSelection())), [])
   const [visible, setVisible] = useState(PAGE)
@@ -75,6 +76,16 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
     () => (removed.size ? words.filter((w) => !removed.has(w.w.toLowerCase())) : words),
     [words, removed]
   )
+
+  /** 把勾选的词加进拼写练习 */
+  const addPickedToSpell = async () => {
+    if (!picked.length) return
+    const want = new Set(picked.map((w) => w.toLowerCase()))
+    const words = allWords.filter((w) => want.has(w.w.toLowerCase()))
+    const n = await store.addBookToSpellList(bookId, words)
+    setMsg(n ? `已加入拼写 ${n} 个` : '这些词都已经在拼写里了')
+    window.setTimeout(() => setMsg(''), 2600)
+  }
 
   const removeWord = (w: RawWord) => {
     if (!window.confirm(`从「${name}」里删掉 “${w.w}”？`)) return
@@ -207,6 +218,8 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
 
         <div className="preview-foot">
           <span className="tiny" style={{ color: 'var(--text-tertiary)' }}>
+            {msg ? <b style={{ color: 'var(--green)' }}>{msg}</b> : null}
+            {msg ? ' · ' : ''}
             共 {filtered.length} 个单词
             {picked.length > 0 && (
               <>
@@ -228,6 +241,14 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
           <div className="row" style={{ gap: 8 }}>
             <button className="btn" onClick={onClose}>
               关闭
+            </button>
+            <button
+              className="btn"
+              disabled={picked.length === 0}
+              onClick={() => void addPickedToSpell()}
+              title="把勾选的词加入拼写练习"
+            >
+              加入拼写
             </button>
             <button
               className="btn btn-primary"

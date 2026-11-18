@@ -14,6 +14,7 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
   const state = useAppState()
   const { manifest, customBooks, settings, states } = state
   const [preview, setPreview] = useState<PreviewTarget | null>(null)
+  const [notice, setNotice] = useState('')
 
   const progress = useMemo(() => {
     const map: Record<string, number> = {}
@@ -28,6 +29,14 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
     const active = settings.activeBooks
     const next = active.includes(id) ? active.filter((x) => x !== id) : [...active, id]
     void store.updateSettings({ activeBooks: next })
+  }
+
+  const addBookToSpell = async (bookId: string, name: string) => {
+    const words = await store.getBookWords(bookId)
+    if (!words.length) return
+    const n = await store.addBookToSpellList(bookId, words)
+    setNotice(n ? `「${name}」已加入拼写练习，新增 ${n} 个词` : `「${name}」的词都已经在拼写里了`)
+    window.setTimeout(() => setNotice(''), 3200)
   }
 
   const allBooks = [
@@ -77,6 +86,31 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
         </div>
       </div>
 
+      {notice && (
+        <div
+          className="card fade-in"
+          style={{
+            marginBottom: 14,
+            borderColor: 'rgba(48,209,88,0.4)',
+            background: 'rgba(48,209,88,0.08)',
+          }}
+        >
+          <div className="row" style={{ gap: 8 }}>
+            <span style={{ color: 'var(--green)', display: 'flex' }}>
+              <IconCheck size={15} />
+            </span>
+            <span style={{ fontSize: 13 }}>{notice}</span>
+            <button
+              className="btn"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => onNavigate('spell')}
+            >
+              去拼写
+            </button>
+          </div>
+        </div>
+      )}
+
       {groups
         .filter((g) => g.category !== '自建')
         .map((g) => (
@@ -110,6 +144,16 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                         <span>
                           {learned} / {b.count} 词
                         </span>
+                        <button
+                          className="preview-link"
+                          title="把这本词书整本加入拼写练习"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void addBookToSpell(b.id, b.name)
+                          }}
+                        >
+                          加入拼写
+                        </button>
                         <button
                           className="preview-link"
                           title="随机打乱这本书的背词顺序"
@@ -227,6 +271,16 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                     <span>
                       {learned} / {b.words.length} 词
                     </span>
+                    <button
+                      className="preview-link"
+                      title="把这本词书整本加入拼写练习"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void addBookToSpell(b.id, b.name)
+                      }}
+                    >
+                      加入拼写
+                    </button>
                     <button
                       className="preview-link"
                       title="随机打乱这本书的背词顺序"

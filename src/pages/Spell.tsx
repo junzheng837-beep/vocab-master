@@ -142,7 +142,7 @@ function LibraryPicker({ onAdded }: { onAdded: (msg: string) => void }) {
   async function add(lib: SpellLibrary, words: SpellLibWord[], label: string) {
     setBusy(true)
     try {
-      const n = await store.addManyToSpellList(lib.id, words.map(toRaw))
+      const n = await store.addManyToSpellList(lib.id, words.map(toRaw), label)
       onAdded(n ? `已加入 ${n} 个单词（${label}）` : '这些单词已经在拼写列表里了')
     } finally {
       setBusy(false)
@@ -207,6 +207,7 @@ export default function SpellPage() {
   const state = useAppState()
   const { spellList } = state
 
+  const [group, setGroup] = useState('all')
   const [order, setOrder] = useState<number[]>([])
   const [pos, setPos] = useState(0)
   const [input, setInput] = useState('')
@@ -214,18 +215,38 @@ export default function SpellPage() {
   const [result, setResult] = useState<'idle' | 'correct' | 'wrong'>('idle')
   const [notice, setNotice] = useState('')
 
-  const total = spellList.length
+  /** 拼写词库的分类：按来源词书分组 */
+  const groups = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of spellList) {
+      const g = s.group ?? '手动添加'
+      map.set(g, (map.get(g) ?? 0) + 1)
+    }
+    return [...map.entries()].map(([name, count]) => ({ name, count }))
+  }, [spellList])
+
+  const list = useMemo(
+    () => (group === 'all' ? spellList : spellList.filter((s) => (s.group ?? '手动添加') === group)),
+    [spellList, group]
+  )
+
+  const total = list.length
+
+  // 选中的分类被清空了就退回全部
+  useEffect(() => {
+    if (group !== 'all' && !groups.some((g) => g.name === group)) setGroup('all')
+  }, [groups, group])
 
   // 每次进入或列表变化时重新洗牌
   useEffect(() => {
-    setOrder(shuffle(spellList.map((_, i) => i)))
+    setOrder(shuffle(list.map((_, i) => i)))
     setPos(0)
     setInput('')
     setHint(0)
     setResult('idle')
-  }, [total])
+  }, [list])
 
-  const item = order.length ? spellList[order[pos]] : undefined
+  const item = order.length ? list[order[pos]] : undefined
   const word = item?.word
 
   // 前缀 / 后缀只算一次，遮罩和提示文案共用
@@ -308,7 +329,7 @@ export default function SpellPage() {
   }
 
   function restart() {
-    setOrder(shuffle(spellList.map((_, i) => i)))
+    setOrder(shuffle(list.map((_, i) => i)))
     setPos(0)
     setInput('')
     setHint(0)
@@ -385,6 +406,7 @@ export default function SpellPage() {
             <div className="page-title">拼写练习</div>
             <div className="page-subtitle">
               根据中文释义把单词完整拼出来 · 第 {pos + 1} / {order.length} 个
+              {group !== 'all' && ` · ${group}`}
             </div>
           </div>
           <button
@@ -398,6 +420,28 @@ export default function SpellPage() {
           </button>
         </div>
       </div>
+
+      {groups.length > 0 && (
+        <div className="spell-groups">
+          <button
+            className={`spell-group ${group === 'all' ? 'on' : ''}`}
+            onClick={() => setGroup('all')}
+          >
+            全部
+            <span className="spell-group-num">{spellList.length}</span>
+          </button>
+          {groups.map((g) => (
+            <button
+              key={g.name}
+              className={`spell-group ${group === g.name ? 'on' : ''}`}
+              onClick={() => setGroup(g.name)}
+            >
+              {g.name}
+              <span className="spell-group-num">{g.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="progress-track" style={{ height: 5, marginBottom: 22 }}>
         <div className="progress-fill" style={{ width: `${(pos / order.length) * 100}%` }} />

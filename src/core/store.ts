@@ -1249,12 +1249,25 @@ class AppStore {
     return this.state.spellList.some((s) => s.key === key)
   }
 
-  async addToSpellList(key: string, word: RawWord) {
+  /** 拼写列表的分类名：优先取词书名字 */
+  bookNameOf(bookId: string): string {
+    const meta = this.state.manifest.find((b) => b.id === bookId)
+    if (meta) return meta.name
+    const custom = this.state.customBooks.find((b) => b.id === bookId)
+    return custom?.name ?? '手动添加'
+  }
+
+  async addToSpellList(key: string, word: RawWord, group?: string) {
     if (this.state.spellList.some((s) => s.key === key)) {
       logger.debug('spell', '已在拼写列表中，跳过', { word: word.w })
       return
     }
-    const item: SpellItem = { key, word, addedAt: Date.now() }
+    const item: SpellItem = {
+      key,
+      word,
+      addedAt: Date.now(),
+      group: group ?? this.bookNameOf(key.split('::')[0]),
+    }
     const spellList = [...this.state.spellList, item]
     this.set({ spellList })
     await this.driver.set(this.keys.spellList, spellList)
@@ -1268,8 +1281,39 @@ class AppStore {
     logger.info('spell', '从拼写列表移除', { key, 剩余: spellList.length })
   }
 
+  /**
+   * 把一本词书整本加入拼写练习。
+   * 分类名用词书名字，重复的自动跳过。
+   */
+  async addBookToSpellList(bookId: string, words: RawWord[]): Promise<number> {
+    const group = this.bookNameOf(bookId)
+    const existing = new Set(this.state.spellList.map((s) => s.key))
+    const now = Date.now()
+    const added: SpellItem[] = []
+    for (const w of words) {
+      const key = `${bookId}::${w.w.toLowerCase()}`
+      if (existing.has(key)) continue
+      existing.add(key)
+      added.push({ key, word: w, addedAt: now, group })
+    }
+    if (!added.length) {
+      logger.info('spell', '整本加入拼写：全部已存在', { bookId, 请求: words.length })
+      return 0
+    }
+    const spellList = [...this.state.spellList, ...added]
+    this.set({ spellList })
+    await this.driver.set(this.keys.spellList, spellList)
+    logger.info('spell', '整本词书加入拼写', {
+      词书: group,
+      新增: added.length,
+      跳过: words.length - added.length,
+      总数: spellList.length,
+    })
+    return added.length
+  }
+
   /** 整本拼写库一次加入，重复的自动跳过 */
-  async addManyToSpellList(libId: string, words: RawWord[]) {
+  async addManyToSpellList(libId: string, words: RawWord[], group?: string) {
     const existing = new Set(this.state.spellList.map((s) => s.key))
     const now = Date.now()
     const added: SpellItem[] = []
@@ -1277,7 +1321,7 @@ class AppStore {
       const key = `lib:${libId}::${w.w.toLowerCase()}`
       if (existing.has(key)) continue
       existing.add(key)
-      added.push({ key, word: w, addedAt: now })
+      added.push({ key, word: w, addedAt: now, group })
     }
     if (!added.length) {
       logger.info('spell', '拼写库整本加入：全部已存在', { libId, 请求: words.length })

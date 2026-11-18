@@ -145,6 +145,8 @@ export interface SpellItem {
   /** 词条完整数据，自带释义、音标、例句，不依赖词书是否加载 */
   word: RawWord
   addedAt: number
+  /** 来源分类名，例如「大学英语四级」「手动添加」 */
+  group?: string
 }
 
 /** 拼写库里的一个词（结构比词条轻，够拼写练习用） */
