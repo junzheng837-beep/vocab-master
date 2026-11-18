@@ -291,6 +291,10 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           name={preview.name}
           custom={preview.custom}
           onClose={() => setPreview(null)}
+          onOpenEssay={() => {
+            setPreview(null)
+            onNavigate('essay')
+          }}
         />
       )}
     </div>

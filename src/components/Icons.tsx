@@ -43,6 +43,16 @@ export function IconBooks({ size = 17, className }: IconProps) {
   )
 }
 
+export function IconPen({ size = 17, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M4 20h16" />
+      <path d="M15.6 4.6a2 2 0 0 1 2.8 0l1 1a2 2 0 0 1 0 2.8L9 18.8 4.6 20l1.2-4.4Z" />
+      <path d="m13.8 6.4 3.8 3.8" />
+    </svg>
+  )
+}
+
 export function IconChart({ size = 17, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>

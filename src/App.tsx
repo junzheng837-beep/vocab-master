@@ -17,6 +17,7 @@ import DebugPage from './pages/Debug'
 import AccountPage from './pages/Account'
 import RootsPage from './pages/Roots'
 import SpellPage from './pages/Spell'
+import EssayPage from './pages/Essay'
 import LettersPage from './pages/Letters'
 
 const PAGES: PageId[] = [
@@ -31,6 +32,7 @@ const PAGES: PageId[] = [
   'roots',
   'spell',
   'letters',
+  'essay',
 ]
 
 interface Route {
@@ -85,6 +87,7 @@ const TITLES: Record<PageId, string> = {
   roots: '词根词缀',
   spell: '拼写练习',
   letters: '首字母词库',
+  essay: '选词生文',
 }
 
 export default function App() {
@@ -204,6 +207,7 @@ export default function App() {
             <RootsPage onStart={(scopeParam) => navigate(`/study/${scopeParam}`)} />
           )}
           {page === 'spell' && <SpellPage />}
+          {page === 'essay' && <EssayPage onNavigate={(p) => navigate(`/${p}`)} />}
           {page === 'letters' && (
             <LettersPage onStart={(scopeParam) => navigate(`/study/${scopeParam}`)} />
           )}

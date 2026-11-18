@@ -1,26 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { store } from '../core/store'
+import {
+  clearSelection,
+  getSelection,
+  isSelected,
+  subscribeSelection,
+  toggleSelection,
+} from '../core/essay'
 import { speak } from '../core/speech'
 import { logger } from '../core/logger'
 import type { RawWord } from '../core/types'
-import { IconSpeaker } from './Icons'
+import { IconCheck, IconSpeaker } from './Icons'
 
 interface Props {
   bookId: string
   name: string
   custom?: boolean
   onClose: () => void
+  /** 选好词后跳到「选词生文」 */
+  onOpenEssay: () => void
 }
 
 const PAGE = 300
 
 /** 词库预览：把一个词书里的所有单词列出来，可搜索 */
-export default function BookPreview({ bookId, name, custom, onClose }: Props) {
+export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay }: Props) {
   const [words, setWords] = useState<RawWord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [removed, setRemoved] = useState<Set<string>>(new Set())
+  const [picked, setPicked] = useState<string[]>(getSelection)
+
+  useEffect(() => subscribeSelection(() => setPicked(getSelection())), [])
   const [visible, setVisible] = useState(PAGE)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -137,7 +149,14 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
             <div className="preview-empty">没有匹配的单词</div>
           )}
           {shown.map((w, i) => (
-            <div className="preview-row" key={`${w.w}-${i}`}>
+            <div
+              className={`preview-row ${isSelected(w.w) ? 'is-picked' : ''}`}
+              key={`${w.w}-${i}`}
+              onClick={() => toggleSelection(w.w)}
+            >
+              <span className={`preview-check ${isSelected(w.w) ? 'on' : ''}`} aria-hidden="true">
+                {isSelected(w.w) && <IconCheck size={10} />}
+              </span>
               <div className="preview-word">
                 <span className="preview-word-text">{w.w}</span>
                 {(w.uk || w.us) && (
@@ -146,7 +165,10 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
                 <button
                   className="preview-speak"
                   title="朗读"
-                  onClick={() => speak(w.w)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    speak(w.w)
+                  }}
                 >
                   <IconSpeaker size={12} />
                 </button>
@@ -154,7 +176,10 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
                 <button
                   className="preview-del"
                   title="从词书里删掉这个词"
-                  onClick={() => removeWord(w)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeWord(w)
+                  }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 7h16M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7M6.5 7l.8 12.1A1.9 1.9 0 0 0 9.2 21h5.6a1.9 1.9 0 0 0 1.9-1.9L17.5 7" />
@@ -183,10 +208,35 @@ export default function BookPreview({ bookId, name, custom, onClose }: Props) {
         <div className="preview-foot">
           <span className="tiny" style={{ color: 'var(--text-tertiary)' }}>
             共 {filtered.length} 个单词
+            {picked.length > 0 && (
+              <>
+                {' · '}
+                <b style={{ color: 'var(--accent)' }}>已选 {picked.length} 个</b>
+                <button
+                  className="link-btn"
+                  style={{ marginLeft: 8 }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    clearSelection()
+                  }}
+                >
+                  清空
+                </button>
+              </>
+            )}
           </span>
-          <button className="btn" onClick={onClose}>
-            关闭
-          </button>
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn" onClick={onClose}>
+              关闭
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={picked.length === 0}
+              onClick={onOpenEssay}
+            >
+              生成范文
+            </button>
+          </div>
         </div>
       </div>
     </div>

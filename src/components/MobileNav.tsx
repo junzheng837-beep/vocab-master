@@ -7,6 +7,7 @@ import {
   IconChart,
   IconHome,
   IconLetter,
+  IconPen,
   IconPlus,
   IconSettings,
   IconSparkle,
@@ -20,7 +21,7 @@ interface Props {
   onNavigate: (p: PageId) => void
 }
 
-const MORE_PAGES: PageId[] = ['roots', 'letters', 'spell', 'import', 'account', 'settings', 'debug']
+const MORE_PAGES: PageId[] = ['roots', 'letters', 'spell', 'essay', 'import', 'account', 'settings', 'debug']
 
 function IconMore({ size = 20 }: { size?: number }) {
   return (
@@ -85,6 +86,7 @@ export default function MobileNav({ page, onNavigate }: Props) {
     { id: 'spell', label: '拼写练习', desc: '按释义拼出单词', icon: <IconSpell size={19} />, badge: spellCount },
     { id: 'letters', label: '首字母', desc: '按字母刷词', icon: <IconLetter size={19} /> },
     { id: 'roots', label: '词根词缀', desc: '按词根背一串', icon: <IconSparkle size={19} /> },
+    { id: 'essay', label: '选词生文', desc: '用选的词找一篇范文', icon: <IconPen size={19} /> },
     { id: 'import', label: '导入词库', desc: '粘贴自己的生词', icon: <IconPlus size={19} /> },
     { id: 'account', label: state.user ? '我的账号' : '登录', desc: state.user ? state.user.username : '登录后词库归属账号', icon: <IconUser size={19} /> },
     { id: 'settings', label: '设置', desc: '节奏与外观', icon: <IconSettings size={19} /> },

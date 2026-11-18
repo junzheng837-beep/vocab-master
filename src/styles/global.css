@@ -2273,11 +2273,37 @@ textarea.input {
   padding: 4px 0;
 }
 .preview-row {
-  padding: 9px 20px;
+  padding: 9px 20px 9px 42px;
   display: flex;
   flex-direction: column;
   gap: 2px;
   border-bottom: 1px solid var(--separator);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.preview-row.is-picked {
+  background: var(--accent-soft);
+}
+/* 选词用的小圆圈 */
+.preview-check {
+  position: absolute;
+  left: 15px;
+  top: 11px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--separator-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--bg-elevated);
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.preview-check.on {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .preview-row:last-child {
   border-bottom: none;
@@ -2583,6 +2609,316 @@ textarea.input {
   transform: none;
   filter: brightness(0.97);
 }
+/* ==========================================================================
+   选词生文
+   ========================================================================== */
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.essay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.essay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.essay-chip:hover {
+  background: rgba(10, 132, 255, 0.22);
+}
+.essay-chip-x {
+  opacity: 0.55;
+  font-size: 13px;
+  line-height: 1;
+}
+.essay-chip.add {
+  background: transparent;
+  border: 1px dashed var(--separator-strong);
+  color: var(--text-secondary);
+}
+.essay-chip.miss {
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  cursor: default;
+}
+.essay-chip.miss:hover {
+  background: var(--bg-elevated-2);
+}
+
+.essay-match-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+.essay-match {
+  flex: 0 0 auto;
+  min-width: 150px;
+  max-width: 200px;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: border-color 0.12s var(--ease), background 0.12s var(--ease);
+}
+.essay-match.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.essay-match-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.essay-match-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.essay-card {
+  padding: 22px 24px;
+}
+.essay-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.essay-head .btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.essay-head .btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.essay-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.essay-meta {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+.essay-body {
+  font-size: 14.5px;
+  line-height: 1.95;
+  color: var(--text-primary);
+  letter-spacing: 0.003em;
+}
+.essay-body mark {
+  background: rgba(255, 214, 10, 0.28);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+.essay-miss {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--separator);
+}
+.essay-miss-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.essay-miss-hint {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
+
+/* ==========================================================================
+   选词生文
+   ========================================================================== */
+
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-size: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.essay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.essay-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.essay-chip:hover {
+  background: rgba(10, 132, 255, 0.22);
+}
+.essay-chip-x {
+  opacity: 0.55;
+  font-size: 13px;
+  line-height: 1;
+}
+.essay-chip.add {
+  background: transparent;
+  border: 1px dashed var(--separator-strong);
+  color: var(--text-secondary);
+}
+.essay-chip.miss {
+  background: var(--bg-elevated-2);
+  color: var(--text-secondary);
+  cursor: default;
+}
+.essay-chip.miss:hover {
+  background: var(--bg-elevated-2);
+}
+
+.essay-match-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+.essay-match {
+  flex: 0 0 auto;
+  min-width: 150px;
+  max-width: 200px;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: border-color 0.12s var(--ease), background 0.12s var(--ease);
+}
+.essay-match.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.essay-match-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.essay-match-meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.essay-card {
+  padding: 22px 24px;
+}
+.essay-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.essay-head .btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.essay-head .btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.essay-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.essay-meta {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+.essay-body {
+  font-size: 14.5px;
+  line-height: 1.95;
+  color: var(--text-primary);
+  letter-spacing: 0.003em;
+}
+.essay-body mark {
+  background: rgba(255, 214, 10, 0.28);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+.essay-miss {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--separator);
+}
+.essay-miss-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.essay-miss-hint {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+}
+
 /* ==========================================================================
    发音失败提示
    ========================================================================== */
@@ -2949,7 +3285,11 @@ html[data-device="mobile"] .preview-search {
   padding: 0 16px 10px;
 }
 html[data-device="mobile"] .preview-row {
-  padding: 9px 16px;
+  /* 左边留出勾选圈的位置 */
+  padding: 9px 16px 9px 38px;
+}
+html[data-device="mobile"] .preview-check {
+  left: 13px;
 }
 html[data-device="mobile"] .preview-foot {
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
