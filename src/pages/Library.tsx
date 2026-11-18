@@ -15,6 +15,7 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
   const { manifest, customBooks, settings, states } = state
   const [preview, setPreview] = useState<PreviewTarget | null>(null)
   const [notice, setNotice] = useState('')
+  const [noticeTarget, setNoticeTarget] = useState<PageId>('spell')
 
   const progress = useMemo(() => {
     const map: Record<string, number> = {}
@@ -35,7 +36,21 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
     const words = await store.getBookWords(bookId)
     if (!words.length) return
     const n = await store.addBookToSpellList(bookId, words)
+    setNoticeTarget('spell')
     setNotice(n ? `「${name}」已加入拼写练习，新增 ${n} 个词` : `「${name}」的词都已经在拼写里了`)
+    window.setTimeout(() => setNotice(''), 3200)
+  }
+
+  const exportBook = async (bookId: string, name: string) => {
+    const words = await store.getBookWords(bookId)
+    if (!words.length) return
+    const r = await store.addToExportZone(words)
+    setNoticeTarget('export')
+    setNotice(
+      r.added
+        ? `「${name}」已导出 ${r.added} 个词到「${r.zoneName}」`
+        : `「${name}」的词都已经在「${r.zoneName}」里了`
+    )
     window.setTimeout(() => setNotice(''), 3200)
   }
 
@@ -103,9 +118,9 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
             <button
               className="btn"
               style={{ marginLeft: 'auto' }}
-              onClick={() => onNavigate('spell')}
+              onClick={() => onNavigate(noticeTarget)}
             >
-              去拼写
+              {noticeTarget === 'export' ? '去导出区' : '去拼写'}
             </button>
           </div>
         </div>
@@ -153,6 +168,16 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                           }}
                         >
                           加入拼写
+                        </button>
+                        <button
+                          className="preview-link"
+                          title="把这本词书整本导出到导出区"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void exportBook(b.id, b.name)
+                          }}
+                        >
+                          导出
                         </button>
                         <button
                           className="preview-link"
@@ -280,6 +305,16 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                       }}
                     >
                       加入拼写
+                    </button>
+                    <button
+                      className="preview-link"
+                      title="把这本词书整本导出到导出区"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void exportBook(b.id, b.name)
+                      }}
+                    >
+                      导出
                     </button>
                     <button
                       className="preview-link"

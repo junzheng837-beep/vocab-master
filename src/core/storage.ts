@@ -173,6 +173,8 @@ export function makeKeys(prefix: string) {
     bookOrder: `${prefix}cfg:bookOrder`,
     /** 用户从内置词书里删掉的词：{ [bookId]: 小写单词数组 } */
     bookDeleted: `${prefix}cfg:bookDeleted`,
+    /** 导出区：分区列表 + 当前选中 */
+    exportData: `${prefix}cfg:exportData`,
     statePrefix: `${prefix}state:`,
     state: (key: string) => `${prefix}state:${key}`,
   }

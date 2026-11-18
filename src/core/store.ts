@@ -13,6 +13,9 @@ import type {
   BookMeta,
   CustomBook,
   DailyLog,
+  ExportData,
+  ExportWord,
+  ExportZone,
   RawWord,
   Rating,
   SessionEntry,
@@ -63,6 +66,8 @@ export interface AppState {
   bookOrder: Record<string, string[]>
   /** 用户从内置词书里删掉的词 */
   bookDeleted: Record<string, string[]>
+  /** 导出区：分区 + 当前选中 */
+  exportData: ExportData
   manifest: BookMeta[]
   books: Record<string, BookData>
   session: SessionState
@@ -83,6 +88,29 @@ export const DEFAULT_SETTINGS: Settings = {
 
 function emptyLog(date: string): DailyLog {
   return { date, learned: 0, reviewed: 0, ratings: [0, 0, 0, 0], updatedAt: 0 }
+}
+
+export const DEFAULT_EXPORT_ZONE = 'zone:default'
+
+/** 至少保证有一个「默认分区」，并把 activeId 修到合法值 */
+function normalizeExportData(data: ExportData | null | undefined): ExportData {
+  const now = Date.now()
+  const zones: ExportZone[] = (data?.zones ?? []).filter(
+    (z) => z && typeof z.id === 'string' && Array.isArray(z.words)
+  )
+  if (!zones.some((z) => z.id === DEFAULT_EXPORT_ZONE)) {
+    zones.unshift({
+      id: DEFAULT_EXPORT_ZONE,
+      name: '默认分区',
+      words: [],
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+  const activeId = zones.some((z) => z.id === data?.activeId)
+    ? (data as ExportData).activeId
+    : DEFAULT_EXPORT_ZONE
+  return { zones, activeId }
 }
 
 const emptySession: SessionState = {
@@ -120,6 +148,7 @@ class AppStore {
     bookExtras: {},
     bookOrder: {},
     bookDeleted: {},
+    exportData: { zones: [], activeId: '' },
     manifest: [],
     books: {},
     session: emptySession,
@@ -196,17 +225,27 @@ class AppStore {
       this.set({ cloud: { enabled: true, ...this.sync.getStatus() } })
     }
 
-    const [settings, logs, customBooks, stateMap, spellList, bookExtras, bookOrder, bookDeleted] =
-      await Promise.all([
-        this.driver.get<Settings>(this.keys.settings),
-        this.driver.get<Record<string, DailyLog>>(this.keys.logs),
-        this.driver.get<CustomBook[]>(this.keys.customBooks),
-        this.driver.entries<WordState>(this.keys.statePrefix),
-        this.driver.get<SpellItem[]>(this.keys.spellList),
-        this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
-        this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
-        this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
-      ])
+    const [
+      settings,
+      logs,
+      customBooks,
+      stateMap,
+      spellList,
+      bookExtras,
+      bookOrder,
+      bookDeleted,
+      exportData,
+    ] = await Promise.all([
+      this.driver.get<Settings>(this.keys.settings),
+      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+      this.driver.get<CustomBook[]>(this.keys.customBooks),
+      this.driver.entries<WordState>(this.keys.statePrefix),
+      this.driver.get<SpellItem[]>(this.keys.spellList),
+      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
+      this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
+      this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
+      this.driver.get<ExportData>(this.keys.exportData),
+    ])
 
     const states: Record<string, WordState> = {}
     for (const [k, v] of Object.entries(stateMap)) {
@@ -231,6 +270,7 @@ class AppStore {
       bookExtras: bookExtras ?? {},
       bookOrder: bookOrder ?? {},
       bookDeleted: bookDeleted ?? {},
+      exportData: normalizeExportData(exportData),
       states,
       session: { ...emptySession },
     })
@@ -278,17 +318,27 @@ class AppStore {
     await this.sync.flush()
     await this.sync.pull()
 
-    const [settings, logs, customBooks, stateMap, spellList, bookExtras, bookOrder, bookDeleted] =
-      await Promise.all([
-        this.driver.get<Settings>(this.keys.settings),
-        this.driver.get<Record<string, DailyLog>>(this.keys.logs),
-        this.driver.get<CustomBook[]>(this.keys.customBooks),
-        this.driver.entries<WordState>(this.keys.statePrefix),
-        this.driver.get<SpellItem[]>(this.keys.spellList),
-        this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
-        this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
-        this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
-      ])
+    const [
+      settings,
+      logs,
+      customBooks,
+      stateMap,
+      spellList,
+      bookExtras,
+      bookOrder,
+      bookDeleted,
+      exportData,
+    ] = await Promise.all([
+      this.driver.get<Settings>(this.keys.settings),
+      this.driver.get<Record<string, DailyLog>>(this.keys.logs),
+      this.driver.get<CustomBook[]>(this.keys.customBooks),
+      this.driver.entries<WordState>(this.keys.statePrefix),
+      this.driver.get<SpellItem[]>(this.keys.spellList),
+      this.driver.get<Record<string, RawWord[]>>(this.keys.bookExtras),
+      this.driver.get<Record<string, string[]>>(this.keys.bookOrder),
+      this.driver.get<Record<string, string[]>>(this.keys.bookDeleted),
+      this.driver.get<ExportData>(this.keys.exportData),
+    ])
 
     const states: Record<string, WordState> = {}
     for (const [k, v] of Object.entries(stateMap)) {
@@ -303,6 +353,7 @@ class AppStore {
       bookExtras: bookExtras ?? {},
       bookOrder: bookOrder ?? {},
       bookDeleted: bookDeleted ?? {},
+      exportData: normalizeExportData(exportData),
       states,
       cloud: { enabled: true, ...this.sync.getStatus() },
     })
@@ -1241,6 +1292,111 @@ class AppStore {
     await this.driver.set(this.keys.customBooks, customBooks)
     for (const [k] of toDelete) await this.driver.remove(k)
     logger.warn('import', '自建词书已删除', { id, 连带删除的学习记录: toDelete.length })
+  }
+
+  /* ------------------------------------------------------------ 导出区 */
+
+  private async saveExportData(next: ExportData) {
+    this.set({ exportData: next })
+    await this.driver.set(this.keys.exportData, next)
+  }
+
+  /** 把单词加进某个分区（默认加到当前分区），重复的跳过 */
+  async addToExportZone(
+    words: RawWord[],
+    zoneId?: string
+  ): Promise<{ added: number; skipped: number; zoneName: string }> {
+    const data = this.state.exportData
+    const targetId = zoneId ?? data.activeId ?? DEFAULT_EXPORT_ZONE
+    const zone = data.zones.find((z) => z.id === targetId)
+    if (!zone) return { added: 0, skipped: 0, zoneName: '' }
+
+    const seen = new Set(zone.words.map((w) => w.w.toLowerCase()))
+    const fresh: ExportWord[] = []
+    const now = Date.now()
+    for (const w of words) {
+      const key = w.w.trim().toLowerCase()
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      fresh.push({ w: w.w, ph: w.us || w.uk || '', t: w.t ?? [], addedAt: now })
+    }
+    const skipped = words.length - fresh.length
+
+    if (fresh.length) {
+      const zones = data.zones.map((z) =>
+        z.id === targetId
+          ? { ...z, words: [...z.words, ...fresh], updatedAt: now }
+          : z
+      )
+      await this.saveExportData({ ...data, zones })
+    }
+
+    logger.info('export', '导出到分区', {
+      分区: zone.name,
+      新增: fresh.length,
+      跳过重复: skipped,
+    })
+    return { added: fresh.length, skipped, zoneName: zone.name }
+  }
+
+  async createExportZone(name: string): Promise<ExportZone> {
+    const data = this.state.exportData
+    const zone: ExportZone = {
+      id: this.nextId('zone'),
+      name: name.trim() || '新分区',
+      words: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+    await this.saveExportData({ zones: [...data.zones, zone], activeId: zone.id })
+    logger.info('export', '新建导出分区', { 名称: zone.name })
+    return zone
+  }
+
+  async renameExportZone(id: string, name: string) {
+    const data = this.state.exportData
+    const clean = name.trim()
+    if (!clean) return
+    const zones = data.zones.map((z) =>
+      z.id === id ? { ...z, name: clean, updatedAt: Date.now() } : z
+    )
+    await this.saveExportData({ ...data, zones })
+  }
+
+  async removeExportZone(id: string) {
+    const data = this.state.exportData
+    if (id === DEFAULT_EXPORT_ZONE) return
+    const zones = data.zones.filter((z) => z.id !== id)
+    const activeId = data.activeId === id ? DEFAULT_EXPORT_ZONE : data.activeId
+    await this.saveExportData({ zones, activeId })
+    logger.info('export', '删除导出分区', { id })
+  }
+
+  async setActiveExportZone(id: string) {
+    const data = this.state.exportData
+    if (data.activeId === id) return
+    if (!data.zones.some((z) => z.id === id)) return
+    await this.saveExportData({ ...data, activeId: id })
+  }
+
+  async removeWordFromExportZone(zoneId: string, word: string) {
+    const data = this.state.exportData
+    const key = word.trim().toLowerCase()
+    const zones = data.zones.map((z) =>
+      z.id === zoneId
+        ? { ...z, words: z.words.filter((w) => w.w.toLowerCase() !== key), updatedAt: Date.now() }
+        : z
+    )
+    await this.saveExportData({ ...data, zones })
+  }
+
+  async clearExportZone(zoneId: string) {
+    const data = this.state.exportData
+    const zones = data.zones.map((z) =>
+      z.id === zoneId ? { ...z, words: [], updatedAt: Date.now() } : z
+    )
+    await this.saveExportData({ ...data, zones })
+    logger.info('export', '清空导出分区', { zoneId })
   }
 
   /* ------------------------------------------------------------ 拼写练习 */

@@ -77,6 +77,16 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
     [words, removed]
   )
 
+  /** 把勾选的词放进导出区 */
+  const exportPicked = async () => {
+    if (!picked.length) return
+    const want = new Set(picked.map((w) => w.toLowerCase()))
+    const words = allWords.filter((w) => want.has(w.w.toLowerCase()))
+    const r = await store.addToExportZone(words)
+    setMsg(r.added ? `已导出 ${r.added} 个到「${r.zoneName}」` : `这些词都在「${r.zoneName}」里了`)
+    window.setTimeout(() => setMsg(''), 2600)
+  }
+
   /** 把勾选的词加进拼写练习 */
   const addPickedToSpell = async () => {
     if (!picked.length) return
@@ -241,6 +251,14 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
           <div className="row" style={{ gap: 8 }}>
             <button className="btn" onClick={onClose}>
               关闭
+            </button>
+            <button
+              className="btn"
+              disabled={picked.length === 0}
+              onClick={() => void exportPicked()}
+              title="把勾选的词放进导出区"
+            >
+              导出
             </button>
             <button
               className="btn"

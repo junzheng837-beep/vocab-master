@@ -5,6 +5,7 @@ import {
   IconBooks,
   IconChart,
   IconHome,
+  IconDownload,
   IconLetter,
   IconPen,
   IconPlus,
@@ -27,6 +28,7 @@ export type PageId =
   | 'spell'
   | 'letters'
   | 'essay'
+  | 'export'
 
 interface Props {
   page: PageId
@@ -66,6 +68,7 @@ export default function Sidebar({ page, onNavigate }: Props) {
     { id: 'roots', label: '词根词缀', icon: <IconSparkle /> },
     { id: 'letters', label: '首字母', icon: <IconLetter /> },
     { id: 'essay', label: '选词生文', icon: <IconPen /> },
+    { id: 'export', label: '导出区', icon: <IconDownload /> },
     {
       id: 'spell',
       label: '拼写练习',

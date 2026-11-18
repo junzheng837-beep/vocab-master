@@ -149,6 +149,32 @@ export interface SpellItem {
   group?: string
 }
 
+/** 导出区里的一个词 */
+export interface ExportWord {
+  w: string
+  /** 音标 */
+  ph?: string
+  /** 释义 */
+  t: [string, string][]
+  addedAt: number
+}
+
+/** 导出区的一个分区 */
+export interface ExportZone {
+  id: string
+  name: string
+  words: ExportWord[]
+  createdAt: number
+  updatedAt: number
+}
+
+/** 导出区的整体数据 */
+export interface ExportData {
+  zones: ExportZone[]
+  /** 当前选中的分区 id */
+  activeId: string
+}
+
 /** 拼写库里的一个词（结构比词条轻，够拼写练习用） */
 export interface SpellLibWord {
   w: string
