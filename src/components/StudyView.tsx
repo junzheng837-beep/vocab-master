@@ -66,13 +66,15 @@ export default function StudyView({ scope }: { scope: string }) {
   // 进入页面时按当前范围准备会话；已经在学同一个范围则保持进度
   useEffect(() => {
     if (!state.ready) return
-    // 上一轮已经背完了，重新点进来就开新的一轮，而不是停在完成页
+    // 上一轮已经背完了，重新点进来就开新的一轮，而不是停在完成页。
+    // 判断「背完」看的是每个词都评过分，而不是游标位置：
+    // 全部评完时游标可能停在最后一个词上。
     const finished =
       session.built &&
       session.scope === scope &&
       !session.loading &&
       session.entries.length > 0 &&
-      session.cursor >= session.entries.length
+      session.entries.every((e) => e.done)
     if (session.built && session.scope === scope && !finished) return
     const parsed = parseScope(scope)
     if (parsed.kind === 'book' && !state.settings.activeBooks.includes(parsed.bookId)) {

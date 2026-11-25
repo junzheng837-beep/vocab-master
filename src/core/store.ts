@@ -1039,7 +1039,9 @@ class AppStore {
       session: {
         ...this.state.session,
         entries: nextEntries,
-        cursor: nextCursor === -1 ? idx : nextCursor,
+        // 全部评完时把游标推到末尾：上层据此判断「这一轮结束了」，
+        // 下次进来才会重建会话，把后来新加的词带上
+        cursor: nextCursor === -1 ? nextEntries.length : nextCursor,
         revealed: false,
       },
     })
@@ -1103,6 +1105,9 @@ class AppStore {
       updatedAt: Date.now(),
     }
     const customBooks = this.state.customBooks.map((b) => (b.id === id ? updated : b))
+    this.invalidateBook(id)
+    // 会话里还是加词之前的那批词，不清掉的话新词永远排不进来
+    this.resetSessionFor(id)
     this.set({ customBooks })
     await this.driver.set(this.keys.customBooks, customBooks)
     logger.info('import', '已追加到自建词书', {
@@ -1153,6 +1158,8 @@ class AppStore {
     const prev = this.state.bookExtras[bookId] ?? []
     const bookExtras = { ...this.state.bookExtras, [bookId]: [...prev, ...fresh] }
     this.invalidateBook(bookId)
+    // 会话里还是加词之前的那批词，不清掉的话新词永远排不进来
+    this.resetSessionFor(bookId)
     this.set({ bookExtras })
     await this.driver.set(this.keys.bookExtras, bookExtras)
     logger.info('import', '已追加到内置词书', {
