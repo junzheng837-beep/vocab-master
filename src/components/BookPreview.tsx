@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { store } from '../core/store'
+import { formatBatchTime } from '../core/batch'
 import {
   clearSelection,
   getSelection,
@@ -173,6 +174,7 @@ export default function BookPreview({ bookId, name, custom, onClose, onOpenEssay
             <div
               className={`preview-row ${isSelected(w.w) ? 'is-picked' : ''}`}
               key={`${w.w}-${i}`}
+              title={w.addedAt ? `${formatBatchTime(w.addedAt)} 加入` : undefined}
               onClick={() => toggleSelection(w.w)}
             >
               <span className={`preview-check ${isSelected(w.w) ? 'on' : ''}`} aria-hidden="true">

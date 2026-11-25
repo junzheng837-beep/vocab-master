@@ -5,10 +5,12 @@ import { CloudAuthProvider, SyncDriver, cloudConfigured } from './cloud'
 import { applyRating, dateKey, isDue, makeWordState, startOfDay } from './scheduler'
 import { loadBook, loadLetterWords, loadRoots } from './dict'
 import { parseScope, type LetterSource } from './scope'
+import { BATCH_LEGACY, batchKeyOf, batchLabelOf, formatBatchTime } from './batch'
 import { shuffle } from './utils'
 import { dataUrl } from './paths'
 import { logger } from './logger'
 import type {
+  BookBatch,
   BookData,
   BookMeta,
   CustomBook,
@@ -606,7 +608,16 @@ class AppStore {
       const book = this.bookData(bookId)
       if (book) {
         let words = book.words
-        if (scope.group) words = words.filter((w) => w.g === scope.group)
+        if (scope.group) {
+          // batch:xxx / day:xxx / legacy 是小词库；其余是词书的主题分组
+          const byBatch =
+            scope.group === BATCH_LEGACY ||
+            scope.group.startsWith('batch:') ||
+            scope.group.startsWith('day:')
+          words = byBatch
+            ? words.filter((w) => batchKeyOf(w) === scope.group)
+            : words.filter((w) => w.g === scope.group)
+        }
 
         const unlearned = words.filter(
           (w) => !this.state.states[`${bookId}::${w.w.toLowerCase()}`]
@@ -1050,13 +1061,16 @@ class AppStore {
   /* ------------------------------------------------------------ 自定义词书 */
 
   async addCustomBook(name: string, desc: string, words: CustomBook['words']) {
+    const now = Date.now()
+    // 建书时导入的词算第一个批次，之后再加的词各算一批
+    const batchId = String(now)
     const book: CustomBook = {
       id: this.nextId('custom'),
       name,
       desc,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      words,
+      createdAt: now,
+      updatedAt: now,
+      words: words.map((w) => ({ ...w, addedAt: w.addedAt ?? now, batchId: w.batchId ?? batchId })),
     }
     const customBooks = [...this.state.customBooks, book]
     this.set({ customBooks })
@@ -1099,10 +1113,12 @@ class AppStore {
       return { added: 0, skipped, book: target }
     }
 
+    const now = Date.now()
+    const batchId = String(now)
     const updated: CustomBook = {
       ...target,
-      words: [...target.words, ...fresh],
-      updatedAt: Date.now(),
+      words: [...target.words, ...fresh.map((w) => ({ ...w, addedAt: now, batchId }))],
+      updatedAt: now,
     }
     const customBooks = this.state.customBooks.map((b) => (b.id === id ? updated : b))
     this.invalidateBook(id)
@@ -1156,7 +1172,12 @@ class AppStore {
     }
 
     const prev = this.state.bookExtras[bookId] ?? []
-    const bookExtras = { ...this.state.bookExtras, [bookId]: [...prev, ...fresh] }
+    const now = Date.now()
+    const batchId = String(now)
+    const bookExtras = {
+      ...this.state.bookExtras,
+      [bookId]: [...prev, ...fresh.map((w) => ({ ...w, addedAt: now, batchId }))],
+    }
     this.invalidateBook(bookId)
     // 会话里还是加词之前的那批词，不清掉的话新词永远排不进来
     this.resetSessionFor(bookId)
@@ -1190,6 +1211,61 @@ class AppStore {
     const isCustom = this.state.customBooks.some((b) => b.id === bookId)
     if (!isCustom) await this.ensureBooks([bookId])
     return this.bookData(bookId)?.words ?? []
+  }
+
+  /**
+   * 这本书里的小词库：按加入时间把词分组，新加的在前，词书自带的排最后。
+   */
+  async getBookBatches(bookId: string): Promise<BookBatch[]> {
+    const isCustom = this.state.customBooks.some((b) => b.id === bookId)
+    if (!isCustom) await this.ensureBooks([bookId])
+
+    const words = this.bookData(bookId)?.words ?? []
+    const map = new Map<string, RawWord[]>()
+    for (const w of words) {
+      const key = batchKeyOf(w)
+      const arr = map.get(key)
+      if (arr) arr.push(w)
+      else map.set(key, [w])
+    }
+
+    const legacyLabel = isCustom ? '早期加入' : '词书自带'
+    const list = [...map.entries()]
+      .map(([key, words]) => ({
+        key,
+        label: batchLabelOf(key, legacyLabel),
+        addedAt: words.reduce((m, w) => Math.max(m, w.addedAt ?? 0), 0),
+        count: words.length,
+        words,
+      }))
+      .sort((a, b) => b.addedAt - a.addedAt || b.count - a.count)
+
+    // 同一分钟里加了两次词，名字会撞在一起，这种情况下补上秒
+    const labelCount = new Map<string, number>()
+    for (const b of list) labelCount.set(b.label, (labelCount.get(b.label) ?? 0) + 1)
+    return list.map((b) =>
+      b.addedAt && (labelCount.get(b.label) ?? 0) > 1
+        ? { ...b, label: `${formatBatchTime(b.addedAt, true)} 加入` }
+        : b
+    )
+  }
+
+  /** 有几组小词库，用来决定要不要显示入口（同步、不读词书数据） */
+  countBookBatches(bookId: string): number {
+    const keys = new Set<string>()
+    const cb = this.state.customBooks.find((b) => b.id === bookId)
+
+    if (cb) {
+      for (const w of cb.words) keys.add(batchKeyOf(w))
+      return keys.size
+    }
+
+    const extras = this.state.bookExtras[bookId] ?? []
+    for (const w of extras) keys.add(batchKeyOf(w))
+    const meta = this.state.manifest.find((b) => b.id === bookId)
+    const base = (meta?.count ?? 0) - (this.state.bookDeleted[bookId]?.length ?? 0)
+    if (base > 0) keys.add(BATCH_LEGACY)
+    return keys.size
   }
 
   /** 这本书是否被打乱过 */

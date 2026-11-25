@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { store, useAppState } from '../core/store'
 import type { PageId } from '../components/Sidebar'
 import BookPreview from '../components/BookPreview'
+import BookBatches from '../components/BookBatches'
 import { IconCheck, IconPlus, IconTrash } from '../components/Icons'
 
 interface PreviewTarget {
@@ -14,6 +15,7 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
   const state = useAppState()
   const { manifest, customBooks, settings, states } = state
   const [preview, setPreview] = useState<PreviewTarget | null>(null)
+  const [batches, setBatches] = useState<PreviewTarget | null>(null)
   const [notice, setNotice] = useState('')
   const [noticeTarget, setNoticeTarget] = useState<PageId>('spell')
 
@@ -159,6 +161,18 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                         <span>
                           {learned} / {b.count} 词
                         </span>
+                        {store.countBookBatches(b.id) > 1 && (
+                          <button
+                            className="preview-link"
+                            title="按加入时间分组，只背其中一组"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setBatches({ id: b.id, name: b.name })
+                            }}
+                          >
+                            小词库 {store.countBookBatches(b.id)}
+                          </button>
+                        )}
                         <button
                           className="preview-link"
                           title="把这本词书整本加入拼写练习"
@@ -296,6 +310,18 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
                     <span>
                       {learned} / {b.words.length} 词
                     </span>
+                    {store.countBookBatches(b.id) > 1 && (
+                      <button
+                        className="preview-link"
+                        title="按加入时间分组，只背其中一组"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setBatches({ id: b.id, name: b.name })
+                        }}
+                      >
+                        小词库 {store.countBookBatches(b.id)}
+                      </button>
+                    )}
                     <button
                       className="preview-link"
                       title="把这本词书整本加入拼写练习"
@@ -383,6 +409,18 @@ export default function LibraryPage({ onNavigate }: { onNavigate: (p: PageId) =>
           onOpenEssay={() => {
             setPreview(null)
             onNavigate('essay')
+          }}
+        />
+      )}
+
+      {batches && (
+        <BookBatches
+          bookId={batches.id}
+          name={batches.name}
+          onClose={() => setBatches(null)}
+          onStart={(scope) => {
+            setBatches(null)
+            window.location.hash = `/study/${scope}`
           }}
         />
       )}

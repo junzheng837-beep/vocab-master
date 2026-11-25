@@ -18,6 +18,21 @@ export interface RawWord {
   syn?: [string, string[]][]
   /** 所属主题（生活日常词书专用） */
   g?: string
+  /** 加入词书的时间（毫秒），内置词书自带的词没有 */
+  addedAt?: number
+  /** 同一次导入的词共享一个批次 id，用来切「小词库」 */
+  batchId?: string
+}
+
+/** 词书里按加入时间切出来的一个小词库 */
+export interface BookBatch {
+  /** 分组 key，直接拼进学习范围：<bookId>::<key> */
+  key: string
+  label: string
+  /** 这一批词加入的时间；词书自带的为 0 */
+  addedAt: number
+  count: number
+  words: RawWord[]
 }
 
 export interface BookGroup {

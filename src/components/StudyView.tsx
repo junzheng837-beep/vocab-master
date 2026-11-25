@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { store, useAppState } from '../core/store'
 import { speak } from '../core/speech'
 import { parseScope } from '../core/scope'
+import { batchLabelOf } from '../core/batch'
 import type { Rating } from '../core/types'
 import { IconChevronLeft, IconChevronRight, IconSparkle, IconSpeaker } from './Icons'
 
@@ -48,7 +49,8 @@ export default function StudyView({ scope }: { scope: string }) {
         state.manifest.find((m) => m.id === parsed.bookId)?.name ??
         state.customBooks.find((b) => b.id === parsed.bookId)?.name ??
         '词书'
-      return parsed.group ? `${name} · ${parsed.group}` : name
+      // 小词库的 scope 是 batch:xxx，转成「11月25日 10:20 加入」这种名字
+      return parsed.group ? `${name} · ${batchLabelOf(parsed.group)}` : name
     }
     return '全部词库'
   }, [scope, state.manifest, state.customBooks])
